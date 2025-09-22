@@ -4,9 +4,8 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>SSTLaw ID card MRZ verification</title>
-  <meta name="description" content="Upload EEA/CH/UK ID front/back, extract MRZ (optional), verify, and send to SSTLaw." />
+  <meta name="description" content="Upload EEA/CH/UK ID front/back, optionally extract MRZ via OCR, verify, and send to SSTLaw." />
   <style>
-    /* --- Base / layout (inspired by SSTLaw article pages) --- */
     *{box-sizing:border-box}
     :root{
       --accent:#0a1a3a;          /* deep navy accent */
@@ -20,71 +19,58 @@
       --radius:14px;
       --shadow:0 1px 2px rgba(0,0,0,.05);
       --shadow-lg:0 10px 30px rgba(0,0,0,.15);
-      --maxw:880px;              /* narrow, article-like width */
+      --maxw:880px;              /* article-like width */
       --lh:1.6;
     }
-
     html,body{height:100%}
     body{
       margin:0;background:var(--bg);color:var(--text);
       font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Arial,sans-serif;
       line-height:var(--lh);
-      -webkit-font-smoothing:antialiased; text-rendering:optimizeLegibility;
+      -webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility;
     }
 
-    /* Header bar (minimal, solid accent like site) */
-    header{
-      background:var(--accent);color:#fff;padding:24px 16px;
-      box-shadow:var(--shadow);
-    }
-    header h1{
-      margin:0 auto;max-width:var(--maxw);font-size:24px;font-weight:700;letter-spacing:.2px;
-    }
+    /* Header with logo */
+    header{background:var(--accent);color:#fff;padding:20px 16px;box-shadow:var(--shadow)}
+    .header-inner{display:flex;align-items:center;gap:20px;max-width:var(--maxw);margin:0 auto}
+    .logo{height:50px;width:auto}
+    header h1{margin:0;font-size:24px;font-weight:700}
 
-    /* Main container & cards */
+     /* Main + cards */
     main{max-width:var(--maxw);margin:32px auto;padding:0 16px}
-    .card{
-      background:var(--card);border:1px solid var(--border);
-      border-radius:var(--radius);box-shadow:var(--shadow);
-      padding:22px 22px 14px;margin:18px 0;
-    }
+    .card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow);padding:22px;margin:18px 0}
 
+    /* Intro paragraphs */
+    p.intro{color:var(--text);font-size:14px;text-align:justify;margin:0 0 12px}
+    .note{font-size:14px;color:var(--muted);text-align:justify}
+
+    /* Grid */
     .row{display:grid;grid-template-columns:1fr 1fr;gap:16px}
-    .row > *{min-width:0}
+    .row>*{min-width:0}
     @media (max-width:820px){ .row{grid-template-columns:1fr} }
     .row-3{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
     @media (max-width:820px){ .row-3{grid-template-columns:1fr 1fr} }
     @media (max-width:560px){ .row-3{grid-template-columns:1fr} }
 
-    /* Form controls */
+    /* Forms */
     label{font-weight:600;display:block;margin:10px 0 6px}
     input[type="file"],input[type="text"],textarea{
-      width:100%;padding:12px;border:1px solid var(--border);
-      border-radius:10px;background:#fff;color:var(--text);line-height:1.4;
+      width:100%;padding:12px;border:1px solid var(--border);border-radius:10px;background:#fff;color:var(--text)
     }
     textarea{min-height:100px;resize:vertical}
 
     /* Buttons */
-    .btn{
-      appearance:none;border:0;border-radius:12px;background:var(--btn);
-      color:#fff;padding:10px 16px;font-weight:700;cursor:pointer;box-shadow:var(--shadow);
-    }
+    .btn{appearance:none;border:0;border-radius:12px;background:var(--btn);color:#fff;padding:10px 16px;font-weight:700;cursor:pointer;box-shadow:var(--shadow)}
     .btn.secondary{background:var(--btn-alt)}
     .btn:disabled{opacity:.6;cursor:not-allowed}
     .steps{display:flex;gap:10px;flex-wrap:wrap;margin-top:10px}
-    .steps .btn span.step{
-      background:#fff;color:var(--accent);display:inline-block;margin-right:8px;
-      padding:2px 8px;border-radius:999px;font-weight:800
-    }
+    .steps .btn span.step{background:#fff;color:var(--accent);display:inline-block;margin-right:8px;padding:2px 8px;border-radius:999px;font-weight:800}
 
-    /* Links styled like body copy (black, underlined on hover) */
-    .link{appearance:none;border:0;background:transparent;color:var(--text);
-      text-decoration:underline;cursor:pointer;padding:0;font-weight:600}
-    .link:hover{opacity:.85}
+    /* Links */
+    .link{appearance:none;border:0;background:transparent;color:var(--text);text-decoration:underline;cursor:pointer;padding:0;font-weight:600}
+    .link:hover{opacity:.9}
 
-    /* Helper text & status lines (justified body style) */
-    p,.note,footer{color:var(--text);text-align:justify}
-    .note{font-size:14px;margin-top:6px;color:var(--muted)}
+    /* Status */
     .status{margin-top:10px;font-size:14px}
     .ok{color:#0b8a41}.err{color:#b42318}.info{color:#1e40af}
 
@@ -95,39 +81,54 @@
     /* Progress bars */
     .prog-wrap{margin-top:10px}
     .prog{height:10px;background:#eef0f4;border-radius:999px;overflow:hidden}
-    .prog > .bar{height:100%;width:0;background:var(--btn);transition:width .2s ease}
+    .prog>.bar{height:100%;width:0;background:var(--btn);transition:width .2s ease}
     .prog-note{font-size:12px;color:var(--text);margin-top:6px}
     .indet .bar{width:30%;animation:indet 1.2s infinite}
-    @keyframes indet { 0% {margin-left:-30%} 50%{margin-left:50%} 100%{margin-left:100%} }
+    @keyframes indet{0%{margin-left:-30%}50%{margin-left:50%}100%{margin-left:100%}}
 
-    /* Modals (no pop-ups; match article feel) */
+       /* Modals */
     .modal-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.5);display:none;align-items:center;justify-content:center;z-index:1000;padding:16px}
-    .modal{background:#fff;max-width:760px;width:100%;border:1px solid var(--border);
-      border-radius:var(--radius);box-shadow:var(--shadow-lg);overflow:hidden}
+    .modal{background:#fff;max-width:760px;width:100%;border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow-lg);overflow:hidden}
     .modal header{background:var(--accent);color:#fff;padding:12px 16px;display:flex;justify-content:space-between;align-items:center}
     .modal header h2{margin:0;font-size:18px}
     .modal .close{background:none;border:none;color:#fff;font-size:20px;cursor:pointer}
     .modal .content{padding:16px;color:var(--text);text-align:justify}
     .modal img{max-width:100%;border:1px solid var(--border);border-radius:8px;margin:10px 0}
 
-    /* “Terms and conditions” block */
+    /* Terms and conditions */
     .legal{background:#fafbfc;border:1px solid var(--border);border-radius:12px;padding:14px;margin-top:12px;font-size:15px}
-    .legal-title{font-weight:700;margin:0 0 6px 0;color:var(--text)}
-    .legal p{margin:0}
+    .legal-title{font-weight:700;margin:0 0 6px;color:var(--text)}
+    .legal p{margin:0;text-align:justify}
     .legal label{display:flex;gap:8px;align-items:flex-start;margin-top:10px}
+
+    /* Footer styled like sstlaw.lu */
+    .sst-footer{background:#f9f9f9;border-top:1px solid var(--border);padding:30px 16px;margin-top:40px;font-size:14px}
+    .sst-footer .footer-top{display:flex;flex-wrap:wrap;justify-content:space-between;max-width:var(--maxw);margin:0 auto 20px}
+    .sst-footer .footer-col{margin:10px 0;min-width:220px}
+    .sst-footer h3{margin:0 0 10px;font-size:16px;color:var(--accent)}
+    .sst-footer a{color:var(--text);text-decoration:underline}
+    .sst-footer a:hover{color:#ff8644}
+    .footer-links{list-style:none;padding:0;margin:0}
+    .footer-links li{margin:6px 0}
+    .footer-bottom{text-align:center;color:var(--muted)}
   </style>
 
-  <!-- Tesseract.js (browser OCR) -->
+    <!-- Tesseract.js (browser OCR) -->
   <script src="https://unpkg.com/tesseract.js@4.0.2/dist/tesseract.min.js"></script>
 </head>
 <body>
-  <header><h1>SSTLaw ID card MRZ verification</h1></header>
+  <header>
+    <div class="header-inner">
+      <img src="pictures/logo.png" alt="Schirrer Schons Tritschler logo" class="logo">
+      <h1>SSTLaw ID card MRZ verification</h1>
+    </div>
+  </header>
 
   <main>
     <div class="card">
-      <p class="note"><strong>Currently, only ID cards issued by a member State of the European Economic Area, Switzerland, and the United Kingdom are accepted.</strong> Support for international passports will be implemented soon. Thank you for your understanding.</p>
+      <p class="intro"><strong>Currently, only ID cards issued by a member State of the European Economic Area, Switzerland, and the United Kingdom are accepted.</strong> Support for international passports will be implemented soon. Thank you for your understanding.</p>
+      <p class="intro"><strong>Accepted file formats:</strong> JPG, JPEG, PNG, PDF (max ~10&nbsp;MB total). Upload the <em>front</em> and <em>back</em> of the ID card.</p>
 
-      <p><strong>Accepted file formats:</strong> JPG, JPEG, PNG, PDF (max ~10&nbsp;MB total). Upload the <em>front</em> and <em>back</em> of the ID card.</p>
       <div class="row">
         <div>
           <label for="frontFile">Front side</label>
@@ -141,6 +142,7 @@
         </div>
       </div>
 
+      <!-- Terms and conditions -->
       <div class="legal">
         <p class="legal-title">Terms and conditions</p>
         <p>
@@ -177,7 +179,7 @@
         <div id="ocrNote" class="prog-note">OCR starting…</div>
       </div>
 
-      <!-- Send progress -->
+         <!-- Send progress -->
       <div id="sendProgWrap" class="prog-wrap" style="display:none">
         <div class="prog indet"><div id="sendBar" class="bar"></div></div>
         <div id="sendNote" class="prog-note">Sending to SSTLaw…</div>
@@ -200,11 +202,7 @@
     </div>
   </main>
 
-  <footer>
-    <strong>GDPR &amp; Privacy (brief):</strong> Your uploads are used solely to extract MRZ data and email it to SSTLaw (<code>llenert@sstlaw.lu</code>). Files and derived data are not stored by the website; the email is sent via a secure provider (SendGrid). By using this form, you confirm you have the right to share the images. For data rights (access, rectification, erasure), contact <code>info@sstlaw.lu</code>.
-  </footer>
-
-  <!-- MRZ modal -->
+    <!-- MRZ modal -->
   <div id="mrzModal" class="modal-backdrop">
     <div class="modal">
       <header>
@@ -220,7 +218,7 @@
     </div>
   </div>
 
-  <!-- How to copy MRZ on mobile modal (JUSTIFIED) -->
+    <!-- How to copy MRZ on mobile modal -->
   <div id="howModal" class="modal-backdrop">
     <div class="modal">
       <header>
@@ -250,7 +248,28 @@
     </div>
   </div>
 
-  <script>
+  <!-- Footer styled like sstlaw.lu -->
+  <footer class="sst-footer">
+    <div class="footer-top">
+      <div class="footer-col">
+        <h3>Luxembourg</h3>
+        <p>6, avenue Guillaume<br/>L-1650 Luxembourg</p>
+        <p><a href="tel:+35228776065">+352 28 77 60 65</a><br/>
+           <a href="mailto:info@sstlaw.lu">info@sstlaw.lu</a></p>
+      </div>
+      <div class="footer-col">
+        <ul class="footer-links">
+          <li><a href="https://sstlaw.lu/privacy-policy/" target="_blank" rel="noopener">Privacy</a></li>
+          <li><a href="https://sstlaw.lu/terms-and-conditions/" target="_blank" rel="noopener">Terms and Conditions</a></li>
+        </ul>
+      </div>
+    </div>
+    <div class="footer-bottom">
+      <p>© Schirrer Schons Tritschler. All rights reserved.</p>
+    </div>
+  </footer>
+
+   <script>
     const API_BASE = 'https://sstidcheck-worker.llenert.workers.dev';
 
     let lastResult = { fields:{}, attachments:{} };
@@ -297,6 +316,7 @@
       if (note) document.getElementById('sendNote').textContent = note;
     }
 
+
     // ---------- File handling & previews ----------
     async function fileToDataURL(file){
       if(!file) return '';
@@ -322,7 +342,7 @@
     document.getElementById('frontFile').addEventListener('change',e=>handlePreview(e.target,document.getElementById('frontPreview')));
     document.getElementById('backFile') .addEventListener('change',e=>handlePreview(e.target, document.getElementById('backPreview')));
 
-    // ---------- Dates & helpers ----------
+       // ---------- Dates & helpers ----------
     function ymd(yyMMdd){
       if(!/^\d{6}$/.test(yyMMdd)) return '';
       const yy=+yyMMdd.slice(0,2), mm=yyMMdd.slice(2,4), dd=yyMMdd.slice(4,6);
@@ -402,6 +422,7 @@
       throw new Error('Unrecognized MRZ format.');
     }
 
+        // ---------- Sanity checks for MRZ (TD1) ----------
     function validateMrz(raw, parsed){
       const lines = raw.trim().split(/\r?\n/).map(l=>l.replace(/\s+/g,'').toUpperCase()).filter(Boolean);
       if (lines.length !== 3) return 'The MRZ should contain exactly 3 lines for an ID card (TD-1).';
@@ -415,6 +436,7 @@
       return '';
     }
 
+    // ---------- OCR: extract MRZ from images (step 1) ----------
     async function extractMrzFromImages() {
       const backFile = document.getElementById('backFile').files?.[0];
       const frontFile = document.getElementById('frontFile').files?.[0];
@@ -467,6 +489,7 @@
       }
     }
 
+    // Button wiring
     extractBtn.addEventListener('click', extractMrzFromImages);
 
     parseBtn.addEventListener('click', () => {
