@@ -2,325 +2,269 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <title>SSTLaw ID card MRZ verification</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <meta name="color-scheme" content="light only">
+  <title>SSTLaw ID card MRZ verification</title>
+  <meta name="description" content="Upload the front and back of an ID card, read the MRZ, and send to SSTLaw." />
+
+  <!-- Minimal, clean styling -->
   <style>
-    :root{ --sst-navy:#0f2747; --sst-gold:#c8a96b; --sst-ink:#1f2a37; --sst-line:#e6e8ec; --sst-bg:#ffffff; --radius:10px; }
-    html,body{background:var(--sst-bg); color:var(--sst-ink); font-family:-apple-system,system-ui,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif; line-height:1.55; margin:0;}
-    .wrap{max-width:1040px; margin:32px auto; padding:0 16px;}
-    header{display:flex; align-items:flex-end; gap:16px; margin-bottom:18px; border-bottom:2px solid var(--sst-line); padding-bottom:10px;}
-    h1{color:var(--sst-navy); font-weight:700; margin:0;}
-    .tag{font-weight:600; color:var(--sst-gold);}
-    .brandline{height:4px; width:100%; background:linear-gradient(90deg,var(--sst-navy),var(--sst-gold)); border-radius:4px; margin-top:6px}
-    .grid{display:grid; grid-template-columns:1fr 1fr; gap:18px;} @media(max-width:900px){.grid{grid-template-columns:1fr;}}
-    .card{border:1px solid var(--sst-line); border-radius:var(--radius); padding:16px; background:#fff;}
-    label{font-weight:600; margin:8px 0 6px; display:block;}
-    input[type=file]{display:block; width:100%;}
-    .accept{font-size:.95rem; color:#555; margin-top:4px}
-    .hint{font-size:.9rem; color:#5b6470;}
-    .preview{width:100%; max-width:280px; height:auto; object-fit:contain; border:1px dashed var(--sst-line); padding:6px; border-radius:8px; background:#fff; margin-top:6px}
-    .btnbar{display:flex; gap:10px; flex-wrap:wrap; margin-top:12px;}
-    .btn{appearance:none; border:1px solid var(--sst-navy); background:#fff; color:var(--sst-navy); padding:10px 14px; border-radius:8px; cursor:pointer; font-weight:700;}
-    .btn[disabled]{opacity:.5; cursor:not-allowed;}
-    .btn-primary{background:var(--sst-navy); color:#fff;}
-    .btn-ghost{border-color:#cbd5e1; color:#111;}
-    pre{background:#0b1220; color:#d3d7de; padding:12px; border-radius:8px; overflow:auto; max-height:280px;}
-    .status{padding:10px 12px; border-radius:8px; background:#f7f8fb; border:1px solid var(--sst-line); margin-top:8px;}
-    .legal h3{margin-top:0; color:var(--sst-navy);}
-    footer{margin-top:28px; padding-top:12px; border-top:1px solid var(--sst-line); color:#6b7280; font-size:.9rem;}
-    a{color:var(--sst-navy); text-decoration:none; border-bottom:1px solid rgba(12,41,71,.25)}
-    a:hover{border-bottom-color:var(--sst-navy)}
+    :root{--bg:#0a1a3a;--fg:#0f172a;--brand:#1e3a8a;--ink:#0b1220}
+    body{font-family: system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,"Helvetica Neue",Arial,sans-serif;margin:0;background:#f7f8fb;color:#0b1220}
+    header{background:var(--bg);color:#fff;padding:20px}
+    header h1{margin:0;font-size:22px}
+    main{max-width:900px;margin:32px auto;padding:0 16px}
+    .card{background:#fff;border:1px solid #e5e7eb;border-radius:14px;box-shadow:0 1px 2px rgba(0,0,0,.04);padding:18px 18px 10px;margin-bottom:16px}
+    .row{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+    .row-3{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+    label{font-weight:600;display:block;margin:8px 0 6px}
+    input[type="file"],input[type="text"],input[type="date"],textarea,select{width:100%;padding:10px;border:1px solid #d1d5db;border-radius:10px}
+    textarea{min-height:86px}
+    .btn{appearance:none;border:0;border-radius:12px;background:var(--brand);color:#fff;padding:10px 16px;font-weight:700;cursor:pointer}
+    .btn.secondary{background:#64748b}
+    .btn:disabled{opacity:.6;cursor:not-allowed}
+    .note{color:#475569;font-size:13px;margin-top:6px}
+    .status{margin-top:10px;font-size:14px}
+    .ok{color:#0b8a41}
+    .err{color:#b42318}
+    .preview{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+    .preview img{max-height:120px;border:1px solid #e5e7eb;border-radius:10px}
+    footer{font-size:13px;color:#475569;margin:32px auto;max-width:900px;padding:0 16px}
+    code{background:#f3f4f6;padding:0 4px;border-radius:6px}
   </style>
 </head>
 <body>
-  <div class="wrap">
-    <header>
-      <div>
-        <h1>SSTLaw ID card MRZ verification</h1>
-        <div class="tag">Prototype — client-side OCR & MRZ parsing</div>
-        <div class="brandline"></div>
+  <header>
+    <h1>SSTLaw ID card MRZ verification</h1>
+  </header>
+
+  <main>
+    <div class="card">
+      <p><strong>Accepted file formats:</strong> JPG, JPEG, PNG, PDF (max ~10&nbsp;MB total). Please upload the <em>front</em> and <em>back</em> of the ID card.</p>
+      <div class="row">
+        <div>
+          <label for="frontFile">Front side</label>
+          <input id="frontFile" type="file" accept="image/*,application/pdf" />
+          <div id="frontPreview" class="preview"></div>
+        </div>
+        <div>
+          <label for="backFile">Back side (MRZ)</label>
+          <input id="backFile" type="file" accept="image/*,application/pdf" />
+          <div id="backPreview" class="preview"></div>
+        </div>
       </div>
-    </header>
-
-    <p class="hint">
-      Upload the <strong>front and back</strong> of an international ID card. We’ll attempt to read the MRZ, validate
-      checksums, and extract surname, given names, date of birth, document number, issuing country, expiry date.
-      We also record UTC timestamp and public IP.
-    </p>
-
-    <div class="grid">
-      <section class="card">
-        <label>Accepted file formats</label>
-        <div class="accept">
-          Images: <strong>JPEG/JPG, PNG, HEIC, WEBP</strong> (up to ~15&nbsp;MB each)<br>
-          PDF: <strong>single-page PDF</strong> (one side only). For best results, use images.
-        </div>
-
-        <label for="fileFront" style="margin-top:14px">Front image / PDF</label>
-        <input id="fileFront" type="file" accept="image/*,.pdf" />
-        <img id="previewFront" class="preview" alt="Front preview" />
-
-        <label for="fileBack" style="margin-top:14px">Back image / PDF</label>
-        <input id="fileBack" type="file" accept="image/*,.pdf" />
-        <img id="previewBack" class="preview" alt="Back preview" />
-
-        <div class="btnbar">
-          <button id="processBtn" class="btn btn-primary">Process & read MRZ</button>
-          <button id="sendEmailBtn" class="btn" disabled>Send to office</button>
-          <button id="downloadBtn" class="btn btn-ghost" disabled>Download JSON</button>
-        </div>
-
-        <p class="hint">Tip: crop so the MRZ (the <code>&lt;</code> lines) is sharp; avoid glare/tilt.</p>
-      </section>
-
-      <section class="card">
-        <h3 style="margin-top:0;color:var(--sst-navy)">Result</h3>
-        <div id="status" class="status">Idle — waiting for images.</div>
-        <h4>Parsed fields</h4>
-        <pre id="resultOutput">No results yet.</pre>
-        <details>
-          <summary>Show raw MRZ text</summary>
-          <pre id="mrzText">—</pre>
-        </details>
-      </section>
+      <p class="note">Tip: If OCR doesn’t read the MRZ, paste the two/three MRZ lines below and click “Parse MRZ text”.</p>
+      <label for="mrzText">MRZ text (optional)</label>
+      <textarea id="mrzText" placeholder="Example (TD1 ID card):
+ID<LUXDOE<<JANE<ALICE
+LUX1234567<8LUX9001029F3012312<<<<<<<<<6
+<<<<<<<<<<<<<<<<<<<<<<<<<"></textarea>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:8px">
+        <button id="parseMrzBtn" class="btn secondary" type="button">Parse MRZ text</button>
+        <button id="processBtn" class="btn secondary" type="button">Process &amp; read MRZ (fallback uses text above)</button>
+        <button id="sendBtn" class="btn" type="button">Send to office</button>
+      </div>
+      <div id="status" class="status"></div>
     </div>
 
-    <section class="card legal" style="margin-top:18px">
-      <h3>GDPR & privacy (summary)</h3>
-      <p>
-        <strong>Controller:</strong> Schirrer Schons Tritschler S.&agrave; r.l. (SSTLaw).<br>
-        <strong>Purpose:</strong> ID-card MRZ verification upon your request.<br>
-        <strong>Lawful basis:</strong> your consent and/or SSTLaw’s legitimate interests where appropriate.<br>
-        <strong>Data processed:</strong> ID images (front/back), MRZ lines and parsed data (name, given names, date of birth,
-        document no., issuing country, expiry), submission IP address, UTC timestamp.<br>
-        <strong>Retention:</strong> this prototype emails data to our office and does not store it on this site.
-        Retention within our systems follows our internal policy.
-      </p>
-      <p>
-        <strong>Your rights:</strong> access, rectification, erasure, restriction, portability, and objection. You may lodge a complaint with the
-        Luxembourg CNPD. See our full <a href="https://sstlaw.lu/privacy-policy/" rel="noopener">Privacy Policy</a>.
-      </p>
-      <p class="hint">Note: this is a static demo. For production, we recommend a secure server workflow with encryption and strict retention.</p>
-    </section>
+    <div class="card">
+      <h3 style="margin:0 0 8px">Extracted fields</h3>
+      <div class="row-3">
+        <div><label>Surname</label><input id="outSurname" type="text" /></div>
+        <div><label>Given names</label><input id="outGiven" type="text" /></div>
+        <div><label>Issuing country</label><input id="outIssuing" type="text" /></div>
+        <div><label>Birth date</label><input id="outBirth" type="text" /></div>
+        <div><label>Expiry date</label><input id="outExpiry" type="text" /></div>
+        <div><label>Document no.</label><input id="outDoc" type="text" /></div>
+      </div>
+      <p class="note">You can correct values here before sending.</p>
+    </div>
+  </main>
 
-    <footer>
-      © Schirrer Schons Tritschler — <a href="https://sstlaw.lu" rel="noopener">sstlaw.lu</a>
-    </footer>
-  </div>
-
-  <canvas id="workcanvas" style="display:none"></canvas>
-
-  <!-- OCR -->
-  <script src="https://cdn.jsdelivr.net/npm/tesseract.js@4.1.1/dist/tesseract.min.js"></script>
-
-  <!-- MRZ parser via ESM -->
-  <script type="module">
-    import * as MRZ from 'https://unpkg.com/mrz@4.2.1/lib/index.js';
-    window.MRZlib = MRZ;
-  </script>
+  <footer>
+    <strong>GDPR &amp; Privacy (brief):</strong> Your uploads are used solely to extract MRZ data and email it to SSTLaw (<code>llenert@sstlaw.lu</code>).
+    Files and derived data are not stored by the website; the email is sent via a secure provider (SendGrid). By using this form, you confirm you have the right to share the images. For data rights (access, rectification, erasure), contact <code>info@sstlaw.lu</code>.  
+  </footer>
 
   <script>
-    const $ = id => document.getElementById(id);
-    const fileFront = $('fileFront'), fileBack = $('fileBack');
-    const previewFront = $('previewFront'), previewBack = $('previewBack');
-    const processBtn = $('processBtn'), sendEmailBtn = $('sendEmailBtn'), downloadBtn = $('downloadBtn');
-    const statusEl = $('status'), resultOutput = $('resultOutput'), mrzText = $('mrzText'), workcanvas = $('workcanvas');
-    let lastResult = null;
+    // === CONFIG ===
+    const API_BASE = 'https://sstidcheck-worker.llenert.workers.dev';
 
-    function previewFile(input, img){ const f=input.files?.[0]; img.src = f ? URL.createObjectURL(f) : ''; }
-    fileFront.addEventListener('change', ()=>previewFile(fileFront, previewFront));
-    fileBack.addEventListener('change', ()=>previewFile(fileBack, previewBack));
+    // === STATE ===
+    let lastResult = null; // what we'll send to the Worker
 
-    async function getPublicIP(){ try{ const r=await fetch('https://api.ipify.org?format=json'); const j=await r.json(); return j.ip||'unknown'; }catch{ return 'unknown'; } }
+    // === UTIL ===
+    const statusEl = document.getElementById('status');
+    function setStatus(msg, ok=false){ statusEl.textContent = msg; statusEl.className = 'status ' + (ok?'ok':'err'); }
 
-    // Compression to keep email size reasonable
-    async function compressImageBase64(file, maxDim=1600, quality=0.82, mime='image/jpeg'){
-      const img = await new Promise((resolve,reject)=>{ const fr=new FileReader(); fr.onload=()=>{ const i=new Image(); i.onload=()=>resolve(i); i.onerror=reject; i.src=fr.result; }; fr.onerror=reject; fr.readAsDataURL(file); });
-      const w0 = img.naturalWidth, h0 = img.naturalHeight; const scale = Math.min(1, maxDim/Math.max(w0,h0));
-      const w = Math.round(w0*scale), h = Math.round(h0*scale);
-      const c = document.createElement('canvas'); c.width=w; c.height=h; c.getContext('2d').drawImage(img,0,0,w,h);
-      return c.toDataURL(mime, quality);
-    }
-
-    async function normalizeToImageFile(file){
-      if (!file) return null;
-      if (!file.name.toLowerCase().endsWith('.pdf')) return file;
-      alert('For highest accuracy, upload images (JPG/PNG/HEIC/WEBP). PDF is accepted but not auto-rasterized here.');
-      return null;
-    }
-
-    function loadImageFromFile(file){
-      return new Promise((resolve,reject)=>{
-        const fr=new FileReader();
-        fr.onload=()=>{ const img=new Image(); img.onload=()=>resolve(img); img.onerror=reject; img.src=fr.result; };
-        fr.onerror=reject; fr.readAsDataURL(file);
+    async function fileToDataURL(file) {
+      if (!file) return '';
+      if (file.type === 'application/pdf') {
+        // We won't preview PDFs, but still encode for sending
+        const buf = await file.arrayBuffer();
+        const bin = String.fromCharCode(...new Uint8Array(buf));
+        return 'data:application/pdf;base64,' + btoa(bin);
+      }
+      return new Promise((resolve, reject) => {
+        const r = new FileReader();
+        r.onload = () => resolve(r.result);
+        r.onerror = reject;
+        r.readAsDataURL(file);
       });
     }
+    function dataUrlToBase64(dataUrl) {
+      if (!dataUrl) return '';
+      const i = dataUrl.indexOf('base64,');
+      return i >= 0 ? dataUrl.slice(i + 7) : dataUrl;
+    }
+    function ymdFromYYMMDD(yyMMdd) {
+      const yy = parseInt(yyMMdd.slice(0,2),10);
+      const year = yy >= 30 ? 1900 + yy : 2000 + yy;
+      return `${year}-${yyMMdd.slice(2,4)}-${yyMMdd.slice(4,6)}`;
+    }
+    function clean(s){ return (s||'').replace(/</g,' ').trim(); }
 
-    async function extractMrzFromImageFile(file){
-      const img=await loadImageFromFile(file);
-      const maxDim=2000; let w=img.naturalWidth, h=img.naturalHeight;
-      if (Math.max(w,h)>maxDim){ const s=maxDim/Math.max(w,h); w=Math.round(w*s); h=Math.round(h*s); }
-      workcanvas.width=w; workcanvas.height=h;
-      const ctx=workcanvas.getContext('2d'); ctx.drawImage(img,0,0,w,h);
+    // === MRZ PARSER (TD3 passports or TD1 ID cards) ===
+    function parseMrzText(linesRaw) {
+      const lines = linesRaw.trim().split(/\r?\n/).map(l => l.replace(/\s+/g,'').toUpperCase()).filter(Boolean);
+      if (lines.length < 2) throw new Error('Paste at least 2 MRZ lines.');
 
-      const crops=[{y:Math.round(h*0.72),height:Math.round(h*0.28)},{y:Math.round(h*0.82),height:Math.round(h*0.18)}];
-      const candidates=[];
-      for (const c of crops){
-        const tmp=document.createElement('canvas'); tmp.width=w; tmp.height=c.height;
-        const tctx=tmp.getContext('2d');
-        tctx.drawImage(workcanvas,0,c.y,w,c.height,0,0,w,c.height);
-        const data=tctx.getImageData(0,0,tmp.width,tmp.height);
-        for (let i=0;i<data.data.length;i+=4){ const r=data.data[i],g=data.data[i+1],b=data.data[i+2]; const lum=0.2126*r+0.7152*g+0.0722*b; data.data[i]=data.data[i+1]=data.data[i+2]=lum; }
-        tctx.putImageData(data,0,0);
-        const blob=await new Promise(res=>tmp.toBlob(res,'image/png'));
-        statusEl.textContent='Running OCR…';
-        try{ const {data}=await Tesseract.recognize(blob,'eng'); candidates.push({text:data?.text||''}); }
-        catch{ candidates.push({text:''}); }
+      const isTD3 = lines.length >= 2 && lines[0].length >= 40 && lines[1].length >= 40;
+      const isTD1 = lines.length >= 3 && lines[0].length >= 28 && lines[1].length >= 28 && lines[2].length >= 28;
+
+      if (isTD3) {
+        const l1 = lines[0].padEnd(44,'<');
+        const l2 = lines[1].padEnd(44,'<');
+        const issuing = l1.slice(2,5);
+        const [surnameRaw, givenRaw=''] = l1.slice(5).split('<<');
+        const docNum = l2.slice(0,9).replace(/</g,'');
+        const nationality = l2.slice(10,13);
+        const birth = ymdFromYYMMDD(l2.slice(13,19));
+        const sex = l2.slice(20,21);
+        const expiry = ymdFromYYMMDD(l2.slice(21,27));
+        return {
+          surname: clean(surnameRaw),
+          given_names: clean(givenRaw.replace(/<+/g,' ')),
+          issuing_country: issuing,
+          nationality, document_number: docNum,
+          birth_date: birth, sex, expiration_date: expiry
+        };
       }
-      const score = s => (s||'').match(/[A-Z0-9<]/gi)?.length || 0;
-      candidates.sort((a,b)=>score(b.text)-score(a.text));
-      return (candidates[0]?.text||'').split('\n').map(l=>l.trim()).filter(Boolean).join('\n');
-    }
 
-    function parseMrzText(mrzRaw){
-      if (!mrzRaw || !mrzRaw.trim()) throw new Error('No MRZ text found.');
-      let s=mrzRaw.toUpperCase().replace(/\s+/g,'\n');
-      const lines=s.split('\n').map(l=>l.replace(/[^A-Z0-9<]/g,'').trim()).filter(Boolean);
-      const joined=lines.join('\n');
-      try { return window.MRZlib.parse(joined); }
-      catch{
-        const clean=joined.replace(/\n/g,''); for (const w of [44,30]){ const arr=[]; for (let i=0;i<clean.length;i+=w) arr.push(clean.slice(i,i+w)); try{ return window.MRZlib.parse(arr.join('\n')); }catch{} }
-        throw new Error('MRZ parser failed.');
+      if (isTD1) {
+        const l1 = lines[0].padEnd(30,'<');
+        const l2 = lines[1].padEnd(30,'<');
+        const issuing = l1.slice(2,5);
+        const [surnameRaw, givenRaw=''] = l1.slice(5).split('<<');
+        const docNum = l2.slice(0,9).replace(/</g,'');
+        const nationality = l2.slice(10,13);
+        const birth = ymdFromYYMMDD(l2.slice(13,19));
+        const sex = l2.slice(20,21);
+        const expiry = ymdFromYYMMDD(l2.slice(21,27));
+        return {
+          surname: clean(surnameRaw),
+          given_names: clean(givenRaw.replace(/<+/g,' ')),
+          issuing_country: issuing,
+          nationality, document_number: docNum,
+          birth_date: birth, sex, expiration_date: expiry
+        };
       }
+
+      throw new Error('Unrecognized MRZ format. Paste raw MRZ lines (2 for passport, 3 for ID).');
     }
 
-    async function buildSubmission(frontFile, backFile, parsed){
-      const utc=new Date().toISOString(); const ip=await getPublicIP();
-      const frontB64=frontFile?await compressImageBase64(frontFile,1600,0.82):'';
-      const backB64 =backFile ?await compressImageBase64(backFile ,1600,0.82):'';
-      const fields={
-        mrz_valid: parsed?.valid ?? null,
-        document_type: parsed?.type ?? null,
-        issuing_country: parsed?.country || parsed?.issuing_country || null,
-        surname: parsed?.names?.familyName || parsed?.surname || null,
-        given_names: parsed?.names?.givenNames || null,
-        birth_date: parsed?.birthDate || null,
-        expiration_date: parsed?.expiryDate || null,
-        document_number: parsed?.documentNumber || null,
-        raw: parsed
-      };
-      return { timestamp_utc: utc, ip, fields, attachments:{front:frontB64, back:backB64} };
+    // === UI handlers ===
+    async function handlePreview(inputEl, previewEl) {
+      previewEl.innerHTML = '';
+      const file = inputEl.files && inputEl.files[0];
+      if (!file) return;
+      const dataUrl = await fileToDataURL(file);
+      if (dataUrl.startsWith('data:image/')) {
+        const img = new Image(); img.src = dataUrl; img.alt = 'preview';
+        previewEl.appendChild(img);
+      } else {
+        previewEl.textContent = file.name + ' (PDF)';
+      }
+      // keep on lastResult for sending
+      lastResult = lastResult || { fields: {}, attachments: {} };
+      if (inputEl.id === 'frontFile') lastResult.attachments.front = dataUrl;
+      if (inputEl.id === 'backFile')  lastResult.attachments.back  = dataUrl;
     }
 
-    processBtn.addEventListener('click', async ()=>{
-      resultOutput.textContent='Processing…'; statusEl.textContent='Preparing files…';
-      sendEmailBtn.disabled=true; downloadBtn.disabled=true;
+    document.getElementById('frontFile').addEventListener('change', e => handlePreview(e.target, document.getElementById('frontPreview')));
+    document.getElementById('backFile') .addEventListener('change', e => handlePreview(e.target,  document.getElementById('backPreview')));
 
-      let f1=await normalizeToImageFile(fileFront.files[0]);
-      let f2=await normalizeToImageFile(fileBack.files[0]);
-      if (!f1 && !f2){ statusEl.textContent='Please select at least one image.'; resultOutput.textContent='—'; return; }
-
-      try{
-        let mrzRaw=''; if (f1) mrzRaw=await extractMrzFromImageFile(f1);
-        if ((!mrzRaw || mrzRaw.length<6) && f2) mrzRaw=await extractMrzFromImageFile(f2);
-
-        mrzText.textContent=mrzRaw || '—';
-        if (!mrzRaw) throw new Error('No MRZ detected. Try sharper, closer photos.');
-
-        statusEl.textContent='Parsing MRZ…';
-        const parsed=parseMrzText(mrzRaw);
-
-        statusEl.textContent='Building submission…';
-        lastResult=await buildSubmission(f1,f2,parsed);
-
-        resultOutput.textContent=JSON.stringify(lastResult.fields,null,2);
-        statusEl.textContent='Done. You can send the email or download JSON.';
-        sendEmailBtn.disabled=false; downloadBtn.disabled=false;
-      }catch(e){
-        statusEl.textContent='Error: ' + (e?.message||e);
-        resultOutput.textContent='—';
+    document.getElementById('parseMrzBtn').addEventListener('click', () => {
+      const mrzText = document.getElementById('mrzText').value || '';
+      try {
+        const f = parseMrzText(mrzText);
+        // update fields on screen
+        document.getElementById('outSurname').value = f.surname || '';
+        document.getElementById('outGiven').value   = f.given_names || '';
+        document.getElementById('outIssuing').value = f.issuing_country || '';
+        document.getElementById('outBirth').value   = f.birth_date || '';
+        document.getElementById('outExpiry').value  = f.expiration_date || '';
+        document.getElementById('outDoc').value     = f.document_number || '';
+        // stash in state
+        lastResult = lastResult || { attachments: {} };
+        lastResult.fields = { ...f, mrz_valid: true };
+        lastResult.timestamp_utc = new Date().toISOString();
+        setStatus('MRZ parsed ✔', true);
+      } catch (e) {
+        console.error(e);
+        setStatus('MRZ parse failed: ' + e.message, false);
       }
     });
 
-    downloadBtn.addEventListener('click', ()=>{
-      if (!lastResult) return;
-      const blob=new Blob([JSON.stringify(lastResult,null,2)],{type:'application/json'});
-      const url=URL.createObjectURL(blob); const a=document.createElement('a');
-      a.href=url; a.download='mrz_submission_'+new Date().toISOString().replace(/[:.]/g,'-')+'.json';
-      document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+    // Fallback: “Process & read MRZ” just tries to parse whatever is in the text box
+    document.getElementById('processBtn').addEventListener('click', () => {
+      document.getElementById('parseMrzBtn').click();
     });
 
-<!-- ===== Send to Worker (email via SendGrid) ===== -->
-<script>
-  const API_BASE = 'https://sstidcheck-worker.llenert.workers.dev';
+    document.getElementById('sendBtn').addEventListener('click', async () => {
+      try {
+        // Build meta from visible fields (user can correct before sending)
+        const meta = {
+          name:       document.getElementById('outSurname').value || '',
+          firstname:  document.getElementById('outGiven').value || '',
+          country:    document.getElementById('outIssuing').value || '',
+          birthdate:  document.getElementById('outBirth').value || '',
+          expiry:     document.getElementById('outExpiry').value || '',
+          valid:      String((lastResult && lastResult.fields && lastResult.fields.mrz_valid) || false),
+          ip:         '', // optional: can fetch ipify here if you want
+          checkedAtUtc: new Date().toISOString()
+        };
 
-  // turn a dataURL like "data:image/jpeg;base64,AAA..." into just the base64 part
-  function dataUrlToBase64(dataUrl) {
-    if (!dataUrl) return '';
-    const i = dataUrl.indexOf('base64,');
-    return i >= 0 ? dataUrl.slice(i + 7) : dataUrl;
-  }
+        // Prepare attachments (0–2)
+        const files = [];
+        if (lastResult && lastResult.attachments && lastResult.attachments.front) {
+          files.push({
+            name:'front', type: 'application/octet-stream',
+            dataBase64: dataUrlToBase64(lastResult.attachments.front)
+          });
+        }
+        if (lastResult && lastResult.attachments && lastResult.attachments.back) {
+          files.push({
+            name:'back', type: 'application/octet-stream',
+            dataBase64: dataUrlToBase64(lastResult.attachments.back)
+          });
+        }
 
-  // Build the meta object the Worker expects from our parsed result
-  function buildMetaFrom(lastResult) {
-    const f = lastResult?.fields || {};
-    return {
-      name: f.surname || '',
-      firstname: f.given_names || '',
-      birthdate: f.birth_date || '',
-      country: f.issuing_country || '',
-      expiry: f.expiration_date || '',
-      valid: String(f.mrz_valid ?? ''),
-      ip: lastResult?.ip || '',
-      checkedAtUtc: lastResult?.timestamp_utc || new Date().toISOString()
-    };
-  }
-
-  document.getElementById('sendEmailBtn').addEventListener('click', async () => {
-    if (!lastResult) { alert('Process images first.'); return; }
-
-    try {
-      statusEl.textContent = 'Submitting to SSTLaw…';
-
-      // Build up to two attachments (front/back), if present
-      const files = [];
-      if (lastResult.attachments?.front) {
-        files.push({
-          name: 'front.jpg',
-          type: 'image/jpeg',
-          dataBase64: dataUrlToBase64(lastResult.attachments.front)
+        setStatus('Sending to SSTLaw…', true);
+        const res = await fetch(`${API_BASE}/api/send`, {
+          method:'POST',
+          headers:{'Content-Type':'application/json'},
+          body: JSON.stringify({ meta, files })
         });
+        const j = await res.json();
+        if (!res.ok || !j.success) throw new Error(j.error || `HTTP ${res.status}`);
+        setStatus('Sent to office ✔', true);
+        alert('Sent to office ✅');
+      } catch (e) {
+        console.error(e);
+        setStatus('Send failed: ' + (e?.message || e), false);
+        alert('Failed to send: ' + (e?.message || e));
       }
-      if (lastResult.attachments?.back) {
-        files.push({
-          name: 'back.jpg',
-          type: 'image/jpeg',
-          dataBase64: dataUrlToBase64(lastResult.attachments.back)
-        });
-      }
-
-      const payload = {
-        meta: buildMetaFrom(lastResult),
-        files
-      };
-
-      const res = await fetch(`${API_BASE}/api/send`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      });
-
-      const j = await res.json();
-      if (!res.ok || !j.success) throw new Error(j.error || `HTTP ${res.status}`);
-      statusEl.textContent = 'Sent to office ✅';
-    } catch (e) {
-      console.error(e);
-      statusEl.textContent = 'Submit failed: ' + (e?.message || e);
-      alert('Failed to send: ' + (e?.message || e));
-    }
-  });
-</script>
+    });
+  </script>
 </body>
 </html>
