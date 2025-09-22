@@ -47,15 +47,15 @@
         </div>
       </div>
 
-      <p class="note">If OCR isn’t active, paste the raw MRZ lines exactly as printed (2 lines for passports, 3 lines for ID cards) and click “Parse MRZ text”.</p>
-      <label for="mrzText">MRZ text (optional)</label>
+      <p class="note">Please paste the raw MRZ lines exactly as printed (2 lines for passports, 3 lines for ID cards) and click “Verify”. Then click “Send to office” </p>
+      <label for="mrzText">MRZ text</label>
       <textarea id="mrzText" placeholder="Example (TD1 ID card, 3 lines):
 IDLUXOJU2SD8AV5241202<<<<<<<<<
 8408060M3412020LUX<<<<<<<<<<<3
 LENERT<<LAURENT<FREDERIC<<<<<<"></textarea>
 
       <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:8px">
-        <button id="parseMrzBtn" class="btn secondary" type="button">Parse MRZ text</button>
+        <button id="parseMrzBtn" class="btn secondary" type="button">Verify</button>
         <button id="sendBtn" class="btn" type="button">Send to office</button>
       </div>
       <div id="status" class="status"></div>
@@ -71,7 +71,6 @@ LENERT<<LAURENT<FREDERIC<<<<<<"></textarea>
         <div><label>Expiry date</label><input id="outExpiry" type="text" /></div>
         <div><label>Document no.</label><input id="outDoc" type="text" /></div>
       </div>
-      <p class="note">You can correct values here before sending.</p>
     </div>
   </main>
 
