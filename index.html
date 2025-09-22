@@ -36,7 +36,6 @@
     .prog-note{font-size:12px;color:#475569;margin-top:6px}
     .indet .bar{width:30%;animation:indet 1.2s infinite}
     @keyframes indet { 0% {margin-left:-30%} 50%{margin-left:50%} 100%{margin-left:100%} }
-
     /* Modal */
     .modal-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.5);display:none;align-items:center;justify-content:center;z-index:1000}
     .modal{background:#fff;max-width:720px;width:95%;border-radius:14px;box-shadow:0 10px 30px rgba(0,0,0,.25);overflow:hidden}
@@ -45,6 +44,9 @@
     .modal .close{background:none;border:none;color:#fff;font-size:20px;cursor:pointer}
     .modal .content{padding:16px}
     .modal img{max-width:100%;border:1px solid #ddd;border-radius:8px;margin:10px 0}
+    /* Legal block */
+    .legal{background:#f9fafb;border:1px solid #e5e7eb;border-radius:12px;padding:12px;margin-top:10px;font-size:14px;line-height:1.45}
+    .legal label{display:flex;gap:8px;align-items:flex-start;margin-top:10px}
   </style>
 
   <!-- Tesseract.js (browser OCR) -->
@@ -71,19 +73,25 @@
         </div>
       </div>
 
+      <div class="legal">
+        <strong>Compliance notice</strong><br/>
+        By continuing, you acknowledge and accept that SCHIRRER, SCHONS &amp; TRITSCHLER (the “Firm”) is subject to mandatory client due diligence obligations under applicable anti-money laundering and counter-terrorism financing legislation. For this purpose, you consent to provide the Firm with the following information: your surname and given name(s), date of birth, the reference number of your identity card, its issuing country, its expiry date, and your current IPv4 address. No other categories of personal data will be collected. Please note that applicable laws and regulations, notably the Luxembourg Law of 12 November 2004 on the fight against money laundering and terrorist financing, as amended, Regulation (EU) 2015/847, as well as related EU instruments, may restrict or derogate from certain rights otherwise granted under Regulation (EU) 2016/679 (General Data Protection Regulation). These obligations are further specified in the professional rules applicable to members of the Luxembourg Bar (Règlement Intérieur de l’Ordre des Avocats du Barreau de Luxembourg) and in the regulatory framework of the Commission de Surveillance du Secteur Financier (CSSF), which implement and oversee compliance with these requirements.
+        <label><input type="checkbox" id="consentChk" /> <span>I have read and accept this notice.</span></label>
+      </div>
+
       <p class="note">Need help? <button class="link" id="whatIsMrzBtn">What is MRZ text?</button></p>
 
       <label for="mrzText">MRZ text</label>
       <textarea id="mrzText" placeholder="Paste the MRZ here if needed (3 lines for ID cards)."></textarea>
 
       <div class="steps">
-        <button id="extractBtn" class="btn secondary" type="button">
+        <button id="extractBtn" class="btn secondary" type="button" disabled>
           <span class="step">1</span>Extract MRZ from images
         </button>
-        <button id="parseMrzBtn" class="btn secondary" type="button">
+        <button id="parseMrzBtn" class="btn secondary" type="button" disabled>
           <span class="step">2</span>Verify MRZ
         </button>
-        <button id="sendBtn" class="btn" type="button">
+        <button id="sendBtn" class="btn" type="button" disabled>
           <span class="step">3</span>Send to office
         </button>
       </div>
@@ -139,21 +147,289 @@
   </div>
 
   <script>
+    const API_BASE = 'https://sstidcheck-worker.llenert.workers.dev';
+
+    let lastResult = { fields:{}, attachments:{} };
+    const statusEl = document.getElementById('status');
+    const setStatus = (msg, cls='info') => { statusEl.textContent = msg; statusEl.className = 'status ' + cls; };
+
+    // Consent gating
+    const consentChk = document.getElementById('consentChk');
+    const extractBtn = document.getElementById('extractBtn');
+    const parseBtn   = document.getElementById('parseMrzBtn');
+    const sendBtn    = document.getElementById('sendBtn');
+    function updateConsent(){
+      const ok = !!consentChk.checked;
+      extractBtn.disabled = !ok;
+      parseBtn.disabled   = !ok;
+      sendBtn.disabled    = !ok;
+    }
+    consentChk.addEventListener('change', updateConsent);
+    updateConsent();
+
     // Modal logic
     const mrzModal=document.getElementById('mrzModal');
     document.getElementById('whatIsMrzBtn').onclick=()=>{mrzModal.style.display='flex';};
     document.getElementById('closeMrzModal').onclick=()=>{mrzModal.style.display='none';};
     mrzModal.onclick=(e)=>{if(e.target===mrzModal)mrzModal.style.display='none';};
 
-    // Example modification in Verify MRZ error handler
-    function showMrzError(message){
-      document.getElementById('status').textContent=
-        "The image recognition software seems to have scrambled the MRZ text. " +
-        "We apologize for any inconvenience. " +
-        "Please manually insert and/or correct the entire MRZ text (3 lines) exactly as it appears on your ID card, " +
-        "and then click “Verify MRZ” again. ("+message+")";
-      document.getElementById('status').className='status err';
+    // Progress helpers
+    const ocrWrap = document.getElementById('ocrProgWrap');
+    const ocrBar  = document.getElementById('ocrBar');
+    const ocrNote = document.getElementById('ocrNote');
+    function ocrProgress(show, pct, note){
+      ocrWrap.style.display = show ? '' : 'none';
+      if (pct != null) ocrBar.style.width = Math.max(0, Math.min(100, pct)) + '%';
+      if (note) ocrNote.textContent = note;
     }
+    const sendWrap = document.getElementById('sendProgWrap');
+    function sendProgress(show, note){
+      sendWrap.style.display = show ? '' : 'none';
+      if (note) document.getElementById('sendNote').textContent = note;
+    }
+
+    // ---------- File handling & previews ----------
+    async function fileToDataURL(file){
+      if(!file) return '';
+      if(file.type==='application/pdf'){
+        const buf=await file.arrayBuffer();
+        const bin=String.fromCharCode(...new Uint8Array(buf));
+        return 'data:application/pdf;base64,'+btoa(bin);
+      }
+      return new Promise((res,rej)=>{ const r=new FileReader(); r.onload=()=>res(r.result); r.onerror=rej; r.readAsDataURL(file); });
+    }
+    function dataUrlToBase64(u){ const i=u.indexOf('base64,'); return i>=0?u.slice(i+7):u; }
+    function isImageFile(f){ return f && f.type && f.type.startsWith('image/'); }
+
+    async function handlePreview(inputEl, previewEl){
+      previewEl.innerHTML='';
+      const f=inputEl.files&&inputEl.files[0]; if(!f) return;
+      const dataUrl=await fileToDataURL(f);
+      if(dataUrl.startsWith('data:image/')){ const img=new Image(); img.src=dataUrl; img.alt='preview'; previewEl.appendChild(img); }
+      else previewEl.textContent=f.name+' (PDF)';
+      if(inputEl.id==='frontFile') lastResult.attachments.front=dataUrl;
+      if(inputEl.id==='backFile')  lastResult.attachments.back=dataUrl;
+    }
+    document.getElementById('frontFile').addEventListener('change',e=>handlePreview(e.target,document.getElementById('frontPreview')));
+    document.getElementById('backFile') .addEventListener('change',e=>handlePreview(e.target, document.getElementById('backPreview')));
+
+    // ---------- Dates & helpers ----------
+    function ymd(yyMMdd){
+      if(!/^\d{6}$/.test(yyMMdd)) return '';
+      const yy=+yyMMdd.slice(0,2), mm=yyMMdd.slice(2,4), dd=yyMMdd.slice(4,6);
+      const year = yy>=50 ? 1900+yy : 2000+yy; // 50-year cutoff
+      return `${year}-${mm}-${dd}`;
+    }
+    const clean = (s)=> (s||'').replace(/</g,' ').trim();
+    const isAlpha3 = (s)=> /^[A-Z]{3}$/.test(s||'');
+
+    // ---------- MRZ parser (TD3 + TD1 with LU variant) ----------
+    function parseMrzText(raw){
+      const lines = raw.trim().split(/\r?\n/).map(l=>l.replace(/\s+/g,'').toUpperCase()).filter(Boolean);
+      if(lines.length<2) throw new Error('Paste 2–3 MRZ lines.');
+
+      // TD3 passport (kept for future)
+      if(lines.length===2 && lines[0].length>=40 && lines[1].length>=40){
+        const l1=lines[0].padEnd(44,'<'), l2=lines[1].padEnd(44,'<');
+        const issuing=l1.slice(2,5);
+        const [surRaw, givRaw='']=l1.slice(5).split('<<');
+        const doc=l2.slice(0,9).replace(/</g,'');
+        const nationality=l2.slice(10,13).replace(/</g,'');
+        const birth=ymd(l2.slice(13,19));
+        const sex=l2.slice(20,21).replace('<','U');
+        const expiry=ymd(l2.slice(21,27));
+        return {
+          surname:clean(surRaw), given_names:clean(givRaw.replace(/<+/g,' ')),
+          issuing_country:issuing, nationality,
+          document_number:doc, birth_date:birth, sex, expiration_date:expiry
+        };
+      }
+
+      // TD1 ID (Luxembourg-like variant)
+      if(lines.length>=3 && lines[0].startsWith('ID')){
+        const l1=lines[0], l2=lines[1], l3=lines[2];
+        const issuing=l1.slice(2,5).replace(/</g,'');
+        const docNumber=l1.slice(5).replace(/</g,'');
+        const birth=ymd(l2.slice(0,6));
+        const sex=l2.slice(7,8).replace('<','U');
+        const expiry=ymd(l2.slice(8,14));
+        const nationality=l2.slice(15,18).replace(/</g,'');
+        const [surRaw, givRaw='']=l3.split('<<');
+        const given = clean(givRaw.replace(/<+/g,' '));
+        return {
+          surname:clean(surRaw), given_names:given,
+          issuing_country:issuing, nationality,
+          document_number:docNumber, birth_date:birth, sex, expiration_date:expiry
+        };
+      }
+
+      // Generic TD1 fallback
+      if(lines.length>=3){
+        const l1=lines[0], l2=lines[1], l3=lines[2];
+        const issuing = l1.slice(2,5).replace(/</g,'');
+        const [surRaw, givRaw=''] = l3.split('<<');
+        const given = clean(givRaw.replace(/<+/g,' '));
+        const idx=[...l2.matchAll(/\d{6}/g)].map(m=>m.index);
+        let birth='', expiry='', sex='U';
+        if(idx.length>=2){
+          birth = ymd(l2.slice(idx[0], idx[0]+6));
+          expiry= ymd(l2.slice(idx[1], idx[1]+6));
+          sex   = (l2[idx[0]+7]||'<').replace('<','U');
+        }
+        const docNumber=(l1.slice(5).match(/[A-Z0-9]+/)||[''])[0];
+        const nationality=(l2.match(/[A-Z]{3}/g)||[issuing]).pop();
+        return {
+          surname: clean(surRaw),
+          given_names: given,
+          issuing_country: issuing,
+          nationality,
+          document_number: docNumber,
+          birth_date: birth,
+          sex,
+          expiration_date: expiry
+        };
+      }
+
+      throw new Error('Unrecognized MRZ format.');
+    }
+
+    // ---------- Sanity checks for MRZ (TD1) ----------
+    function validateMrz(raw, parsed){
+      const lines = raw.trim().split(/\r?\n/).map(l=>l.replace(/\s+/g,'').toUpperCase()).filter(Boolean);
+      if (lines.length !== 3) return 'The MRZ should contain exactly 3 lines for an ID card (TD-1).';
+      if (!lines.every(l => /^[A-Z0-9<]+$/.test(l))) return 'MRZ must contain only A–Z, digits, and "<" characters.';
+      if (!isAlpha3(parsed.issuing_country)) return 'Issuing country code seems invalid.';
+      if (!isAlpha3(parsed.nationality)) return 'Nationality code seems invalid.';
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(parsed.birth_date)) return 'Birth date could not be read.';
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(parsed.expiration_date)) return 'Expiry date could not be read.';
+      if (!parsed.surname || !parsed.given_names) return 'Name fields appear empty.';
+      if (!parsed.document_number) return 'Document number appears empty.';
+      return '';
+    }
+
+    // ---------- OCR: extract MRZ from images (step 1) ----------
+    async function extractMrzFromImages() {
+      const backFile = document.getElementById('backFile').files?.[0];
+      const frontFile = document.getElementById('frontFile').files?.[0];
+
+      if ((!backFile || !isImageFile(backFile)) && (!frontFile || !isImageFile(frontFile))) {
+        setStatus('Please upload at least one image (JPG/PNG). OCR for PDFs is not supported here. You can paste MRZ manually.', 'err');
+        return;
+      }
+
+      ocrProgress(true, 0, 'OCR starting…');
+      setStatus('Running OCR on image…', 'info');
+
+      const imgFile = (backFile && isImageFile(backFile)) ? backFile : frontFile;
+      const url = URL.createObjectURL(imgFile);
+
+      try {
+        const result = await Tesseract.recognize(url, 'eng', {
+          tessedit_char_whitelist: 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789<',
+          logger: m => {
+            if (m.status === 'recognizing text' && typeof m.progress === 'number') {
+              ocrProgress(true, Math.round(m.progress * 100), `OCR ${Math.round(m.progress*100)}%`);
+            }
+          }
+        });
+        URL.revokeObjectURL(url);
+
+        const raw = (result.data?.text || '')
+          .toUpperCase()
+          .replace(/[^\nA-Z0-9<]/g, '');
+
+        const lines = raw.split(/\r?\n/).map(s=>s.trim()).filter(Boolean);
+        const candidates = lines.filter(l => l.length >= 25 && l.length <= 47);
+        const picked = candidates.slice(-3);
+
+        if (picked.length < 2) {
+          ocrProgress(false);
+          setStatus('The image recognition software seems to have scrambled the MRZ text. We apologize for any inconvenience. Please manually insert and/or correct the entire MRZ text (3 lines) exactly as it appears on your ID card, and then click “Verify MRZ” again.', 'err');
+          return;
+        }
+
+        const mrz = picked.join('\n');
+        document.getElementById('mrzText').value = mrz;
+
+        ocrProgress(false);
+        setStatus('OCR complete. The MRZ has been inserted below. Please check the text matches your card, correct if needed, then click “2 Verify MRZ”, and finally “3 Send to office”.', 'ok');
+      } catch (e) {
+        console.error(e);
+        ocrProgress(false);
+        setStatus('OCR failed. Please paste the MRZ manually, then click “Verify MRZ” again.', 'err');
+      }
+    }
+
+    // ---------- Wire buttons ----------
+    extractBtn.addEventListener('click', extractMrzFromImages);
+
+    parseBtn.addEventListener('click', () => {
+      const txt=document.getElementById('mrzText').value||'';
+      try{
+        const parsed=parseMrzText(txt);
+        const problem = validateMrz(txt, parsed);
+        if (problem) {
+          setStatus('The image recognition software seems to have scrambled the MRZ text. We apologize for any inconvenience. Please manually insert and/or correct the entire MRZ text (3 lines) exactly as it appears on your ID card, and then click “Verify MRZ” again. (' + problem + ')', 'err');
+          return;
+        }
+
+        document.getElementById('outSurname').value=parsed.surname||'';
+        document.getElementById('outGiven').value  =parsed.given_names||'';
+        document.getElementById('outIssuing').value=parsed.issuing_country||'';
+        document.getElementById('outNat').value    =parsed.nationality||'';
+        document.getElementById('outBirth').value  =parsed.birth_date||'';
+        document.getElementById('outExpiry').value =parsed.expiration_date||'';
+        document.getElementById('outDoc').value    =parsed.document_number||'';
+
+        lastResult.fields = { ...parsed, mrz_valid:true };
+        lastResult.timestamp_utc=new Date().toISOString();
+        setStatus('MRZ parsed ✔ Please review the extracted fields. If correct, click “3 Send to office”.', 'ok');
+      }catch(e){
+        console.error(e);
+        setStatus('MRZ parse failed. Please paste/correct the 3 MRZ lines exactly as printed and click “Verify MRZ” again.', 'err');
+      }
+    });
+
+    sendBtn.addEventListener('click', async ()=>{
+      try{
+        const meta={
+          name:document.getElementById('outSurname').value||'',
+          firstname:document.getElementById('outGiven').value||'',
+          country:document.getElementById('outIssuing').value||'',
+          nationality:document.getElementById('outNat').value||'',
+          birthdate:document.getElementById('outBirth').value||'',
+          expiry:document.getElementById('outExpiry').value||'',
+          document_number:document.getElementById('outDoc').value||'',
+          valid:String(lastResult?.fields?.mrz_valid||false),
+          ip:'', checkedAtUtc:new Date().toISOString()
+        };
+
+        const files=[];
+        if(lastResult.attachments.front) files.push({name:'front',type:'application/octet-stream',dataBase64:dataUrlToBase64(lastResult.attachments.front)});
+        if(lastResult.attachments.back)  files.push({name:'back', type:'application/octet-stream',dataBase64:dataUrlToBase64(lastResult.attachments.back)});
+
+        sendProgress(true, 'Sending to SSTLaw…');
+        setStatus('Sending to SSTLaw…', 'info');
+
+        const res=await fetch(`${API_BASE}/api/send`,{
+          method:'POST',
+          headers:{'Content-Type':'application/json'},
+          body:JSON.stringify({meta,files})
+        });
+        const j=await res.json();
+
+        sendProgress(false);
+
+        if(!res.ok||!j.success) throw new Error(j.error||`HTTP ${res.status}`);
+        setStatus('Sent to office ✔', 'ok');
+        alert('Sent to office ✅');
+      }catch(e){
+        console.error(e);
+        sendProgress(false);
+        setStatus('Send failed: '+(e?.message||e), 'err');
+        alert('Failed to send: '+(e?.message||e));
+      }
+    });
   </script>
 </body>
 </html>
