@@ -252,21 +252,75 @@
       document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
     });
 
-    // ===== Send to your server =====
-    const API_BASE = 'https://YOUR-SERVER-URL'; // set this after the server is online
-    document.getElementById('sendEmailBtn').addEventListener('click', async ()=>{
-      if (!lastResult){ alert('Process images first.'); return; }
-      try{
-        statusEl.textContent='Submitting to SSTLaw server…';
-        const r = await fetch(`${API_BASE}/api/submit`, {
-          method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(lastResult)
+<!-- ===== Send to Worker (email via SendGrid) ===== -->
+<script>
+  const API_BASE = 'https://sstidcheck-worker.llenert.workers.dev';
+
+  // turn a dataURL like "data:image/jpeg;base64,AAA..." into just the base64 part
+  function dataUrlToBase64(dataUrl) {
+    if (!dataUrl) return '';
+    const i = dataUrl.indexOf('base64,');
+    return i >= 0 ? dataUrl.slice(i + 7) : dataUrl;
+  }
+
+  // Build the meta object the Worker expects from our parsed result
+  function buildMetaFrom(lastResult) {
+    const f = lastResult?.fields || {};
+    return {
+      name: f.surname || '',
+      firstname: f.given_names || '',
+      birthdate: f.birth_date || '',
+      country: f.issuing_country || '',
+      expiry: f.expiration_date || '',
+      valid: String(f.mrz_valid ?? ''),
+      ip: lastResult?.ip || '',
+      checkedAtUtc: lastResult?.timestamp_utc || new Date().toISOString()
+    };
+  }
+
+  document.getElementById('sendEmailBtn').addEventListener('click', async () => {
+    if (!lastResult) { alert('Process images first.'); return; }
+
+    try {
+      statusEl.textContent = 'Submitting to SSTLaw…';
+
+      // Build up to two attachments (front/back), if present
+      const files = [];
+      if (lastResult.attachments?.front) {
+        files.push({
+          name: 'front.jpg',
+          type: 'image/jpeg',
+          dataBase64: dataUrlToBase64(lastResult.attachments.front)
         });
-        if (!r.ok) throw new Error(`Server responded ${r.status}`);
-        const j = await r.json();
-        statusEl.textContent = j.ok ? 'Submitted. Email sent to office.' : 'Server reported failure.';
-      }catch(e){ statusEl.textContent='Submit failed: ' + (e?.message||e); }
-    });
-  </script>
+      }
+      if (lastResult.attachments?.back) {
+        files.push({
+          name: 'back.jpg',
+          type: 'image/jpeg',
+          dataBase64: dataUrlToBase64(lastResult.attachments.back)
+        });
+      }
+
+      const payload = {
+        meta: buildMetaFrom(lastResult),
+        files
+      };
+
+      const res = await fetch(`${API_BASE}/api/send`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+
+      const j = await res.json();
+      if (!res.ok || !j.success) throw new Error(j.error || `HTTP ${res.status}`);
+      statusEl.textContent = 'Sent to office ✅';
+    } catch (e) {
+      console.error(e);
+      statusEl.textContent = 'Submit failed: ' + (e?.message || e);
+      alert('Failed to send: ' + (e?.message || e));
+    }
+  });
+</script>
 </body>
 </html>
