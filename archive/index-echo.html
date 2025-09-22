@@ -6,115 +6,65 @@
   <title>SSTLaw ID card MRZ verification</title>
   <meta name="description" content="Upload EEA/CH/UK ID front/back, extract MRZ (optional), verify, and send to SSTLaw." />
   <style>
-    /* --- Base / layout (inspired by SSTLaw article pages) --- */
+    /* Layout hardening */
     *{box-sizing:border-box}
-    :root{
-      --accent:#0a1a3a;          /* deep navy accent */
-      --text:#000;               /* black text */
-      --border:#e6e7ea;          /* subtle borders */
-      --muted:#6a7280;           /* muted copy */
-      --bg:#ffffff;              /* white page */
-      --card:#ffffff;            /* white cards */
-      --btn:#0a1a3a;             /* primary button bg */
-      --btn-alt:#7a8599;         /* secondary button bg */
-      --radius:14px;
-      --shadow:0 1px 2px rgba(0,0,0,.05);
-      --shadow-lg:0 10px 30px rgba(0,0,0,.15);
-      --maxw:880px;              /* narrow, article-like width */
-      --lh:1.6;
-    }
 
-    html,body{height:100%}
-    body{
-      margin:0;background:var(--bg);color:var(--text);
-      font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Arial,sans-serif;
-      line-height:var(--lh);
-      -webkit-font-smoothing:antialiased; text-rendering:optimizeLegibility;
-    }
+    /* Color & typography */
+    body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Arial,sans-serif;margin:0;background:#f7f8fb;color:#000}
+    header{background:#0a1a3a;color:#fff;padding:20px}
+    header h1{margin:0;font-size:22px}
 
-    /* Header bar (minimal, solid accent like site) */
-    header{
-      background:var(--accent);color:#fff;padding:24px 16px;
-      box-shadow:var(--shadow);
-    }
-    header h1{
-      margin:0 auto;max-width:var(--maxw);font-size:24px;font-weight:700;letter-spacing:.2px;
-    }
-
-    /* Main container & cards */
-    main{max-width:var(--maxw);margin:32px auto;padding:0 16px}
-    .card{
-      background:var(--card);border:1px solid var(--border);
-      border-radius:var(--radius);box-shadow:var(--shadow);
-      padding:22px 22px 14px;margin:18px 0;
-    }
-
+    /* Containers */
+    main{max-width:900px;margin:32px auto;padding:0 16px}
+    .card{background:#fff;border:1px solid #e5e7eb;border-radius:14px;box-shadow:0 1px 2px rgba(0,0,0,.04);padding:18px 18px 10px;margin-bottom:16px;display:block}
     .row{display:grid;grid-template-columns:1fr 1fr;gap:16px}
-    .row > *{min-width:0}
-    @media (max-width:820px){ .row{grid-template-columns:1fr} }
     .row-3{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
-    @media (max-width:820px){ .row-3{grid-template-columns:1fr 1fr} }
-    @media (max-width:560px){ .row-3{grid-template-columns:1fr} }
 
-    /* Form controls */
-    label{font-weight:600;display:block;margin:10px 0 6px}
-    input[type="file"],input[type="text"],textarea{
-      width:100%;padding:12px;border:1px solid var(--border);
-      border-radius:10px;background:#fff;color:var(--text);line-height:1.4;
-    }
-    textarea{min-height:100px;resize:vertical}
+    label{font-weight:600;display:block;margin:8px 0 6px}
+    input[type="file"],input[type="text"],textarea{width:100%;padding:10px;border:1px solid #d1d5db;border-radius:10px}
+    textarea{min-height:90px}
 
-    /* Buttons */
-    .btn{
-      appearance:none;border:0;border-radius:12px;background:var(--btn);
-      color:#fff;padding:10px 16px;font-weight:700;cursor:pointer;box-shadow:var(--shadow);
-    }
-    .btn.secondary{background:var(--btn-alt)}
+    .btn{appearance:none;border:0;border-radius:12px;background:#1e3a8a;color:#fff;padding:10px 16px;font-weight:700;cursor:pointer}
+    .btn.secondary{background:#64748b}
     .btn:disabled{opacity:.6;cursor:not-allowed}
-    .steps{display:flex;gap:10px;flex-wrap:wrap;margin-top:10px}
-    .steps .btn span.step{
-      background:#fff;color:var(--accent);display:inline-block;margin-right:8px;
-      padding:2px 8px;border-radius:999px;font-weight:800
-    }
 
-    /* Links styled like body copy (black, underlined on hover) */
-    .link{appearance:none;border:0;background:transparent;color:var(--text);
-      text-decoration:underline;cursor:pointer;padding:0;font-weight:600}
-    .link:hover{opacity:.85}
+    .link{appearance:none;border:0;background:transparent;color:#000;text-decoration:underline;cursor:pointer;padding:0;font-weight:600}
 
-    /* Helper text & status lines (justified body style) */
-    p,.note,footer{color:var(--text);text-align:justify}
-    .note{font-size:14px;margin-top:6px;color:var(--muted)}
+    .note{font-size:13px;margin-top:6px}
     .status{margin-top:10px;font-size:14px}
     .ok{color:#0b8a41}.err{color:#b42318}.info{color:#1e40af}
 
-    /* Previews */
     .preview{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
-    .preview img{max-height:120px;border:1px solid var(--border);border-radius:10px}
+    .preview img{max-height:120px;border:1px solid #e5e7eb;border-radius:10px}
+
+    footer{font-size:13px;margin:32px auto;max-width:900px;padding:0 16px}
+
+    .steps{display:flex;gap:10px;flex-wrap:wrap;margin-top:8px}
+    .steps .btn span.step{background:#000;display:inline-block;margin-right:8px;padding:2px 8px;border-radius:999px;font-weight:800}
 
     /* Progress bars */
     .prog-wrap{margin-top:10px}
-    .prog{height:10px;background:#eef0f4;border-radius:999px;overflow:hidden}
-    .prog > .bar{height:100%;width:0;background:var(--btn);transition:width .2s ease}
-    .prog-note{font-size:12px;color:var(--text);margin-top:6px}
+    .prog{height:10px;background:#e5e7eb;border-radius:999px;overflow:hidden}
+    .prog > .bar{height:100%;width:0;background:#1e3a8a;transition:width .2s ease}
+    .prog-note{font-size:12px;color:#000;margin-top:6px}
     .indet .bar{width:30%;animation:indet 1.2s infinite}
     @keyframes indet { 0% {margin-left:-30%} 50%{margin-left:50%} 100%{margin-left:100%} }
 
-    /* Modals (no pop-ups; match article feel) */
+    /* Modal (no pop-ups) */
     .modal-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.5);display:none;align-items:center;justify-content:center;z-index:1000;padding:16px}
-    .modal{background:#fff;max-width:760px;width:100%;border:1px solid var(--border);
-      border-radius:var(--radius);box-shadow:var(--shadow-lg);overflow:hidden}
-    .modal header{background:var(--accent);color:#fff;padding:12px 16px;display:flex;justify-content:space-between;align-items:center}
+    .modal{background:#fff;max-width:760px;width:100%;border-radius:14px;box-shadow:0 10px 30px rgba(0,0,0,.25);overflow:hidden}
+    .modal header{background:#0a1a3a;color:#fff;padding:12px 16px;display:flex;justify-content:space-between;align-items:center}
     .modal header h2{margin:0;font-size:18px}
     .modal .close{background:none;border:none;color:#fff;font-size:20px;cursor:pointer}
-    .modal .content{padding:16px;color:var(--text);text-align:justify}
-    .modal img{max-width:100%;border:1px solid var(--border);border-radius:8px;margin:10px 0}
+    .modal .content{padding:16px;color:#000;text-align:justify}
+    .modal img{max-width:100%;border:1px solid #ddd;border-radius:8px;margin:10px 0}
 
-    /* “Terms and conditions” block */
-    .legal{background:#fafbfc;border:1px solid var(--border);border-radius:12px;padding:14px;margin-top:12px;font-size:15px}
-    .legal-title{font-weight:700;margin:0 0 6px 0;color:var(--text)}
-    .legal p{margin:0}
+    /* Legal block */
+    .legal{background:#f9fafb;border:1px solid #e5e7eb;border-radius:12px;padding:12px;margin-top:10px;font-size:14px;line-height:1.45}
     .legal label{display:flex;gap:8px;align-items:flex-start;margin-top:10px}
+
+    /* Global justification for long text */
+    p, footer, .note { text-align: justify; }
   </style>
 
   <!-- Tesseract.js (browser OCR) -->
@@ -142,15 +92,13 @@
       </div>
 
       <div class="legal">
-        <p class="legal-title">Terms and conditions</p>
-        <p>
-          By continuing, you acknowledge and accept that SCHIRRER, SCHONS &amp; TRITSCHLER (the “Firm”) is subject to mandatory client due diligence obligations under applicable anti-money laundering and counter-terrorism financing legislation. For this purpose, you consent to provide the Firm with the following information: your surname and given name(s), date of birth, the reference number of your identity card, its issuing country, its expiry date, your current IPv6 address, your browser user agent, and your device type. No other categories of personal data will be collected. Please note that applicable laws and regulations, notably the Luxembourg Law of 12 November 2004 on the fight against money laundering and terrorist financing, as amended, Regulation (EU) 2015/847, as well as related EU instruments, may restrict or derogate from certain rights otherwise granted under Regulation (EU) 2016/679 (General Data Protection Regulation). These obligations are further specified in the professional rules applicable to members of the Luxembourg Bar (Règlement Intérieur de l’Ordre des Avocats du Barreau de Luxembourg) and in the regulatory framework of the Commission de Surveillance du Secteur Financier (CSSF), which implement and oversee compliance with these requirements.
-        </p>
-        <label><input type="checkbox" id="consentChk" /> <span>I have read and accept these terms and conditions.</span></label>
+        <strong>Compliance notice</strong><br/>
+        By continuing, you acknowledge and accept that SCHIRRER, SCHONS &amp; TRITSCHLER (the “Firm”) is subject to mandatory client due diligence obligations under applicable anti-money laundering and counter-terrorism financing legislation. For this purpose, you consent to provide the Firm with the following information: your surname and given name(s), date of birth, the reference number of your identity card, its issuing country, its expiry date, and your current IPv4 address. No other categories of personal data will be collected. Please note that applicable laws and regulations, notably the Luxembourg Law of 12 November 2004 on the fight against money laundering and terrorist financing, as amended, Regulation (EU) 2015/847, as well as related EU instruments, may restrict or derogate from certain rights otherwise granted under Regulation (EU) 2016/679 (General Data Protection Regulation). These obligations are further specified in the professional rules applicable to members of the Luxembourg Bar (Règlement Intérieur de l’Ordre des Avocats du Barreau de Luxembourg) and in the regulatory framework of the Commission de Surveillance du Secteur Financier (CSSF), which implement and oversee compliance with these requirements.
+        <label><input type="checkbox" id="consentChk" /> <span>I have read and accept this notice.</span></label>
       </div>
 
       <p class="note">
-        Need help?
+        Need help? 
         <button class="link" id="whatIsMrzBtn">What is MRZ text?</button>
         &nbsp;|&nbsp;
         <button class="link" id="howToCopyBtn">How to extract &amp; copy MRZ on a mobile (iPhone/Android)</button>
@@ -201,7 +149,8 @@
   </main>
 
   <footer>
-    <strong>GDPR &amp; Privacy (brief):</strong> Your uploads are used solely to extract MRZ data and email it to SSTLaw (<code>llenert@sstlaw.lu</code>). Files and derived data are not stored by the website; the email is sent via a secure provider (SendGrid). By using this form, you confirm you have the right to share the images. For data rights (access, rectification, erasure), contact <code>info@sstlaw.lu</code>.
+    <strong>GDPR &amp; Privacy (brief):</strong> Your uploads are used solely to extract MRZ data and email it to SSTLaw (<code>llenert@sstlaw.lu</code>).
+    Files and derived data are not stored by the website; the email is sent via a secure provider (SendGrid). By using this form, you confirm you have the right to share the images. For data rights (access, rectification, erasure), contact <code>info@sstlaw.lu</code>.
   </footer>
 
   <!-- MRZ modal -->
@@ -215,12 +164,12 @@
         <p>The <strong>Machine Readable Zone (MRZ)</strong> is the block of two or three lines at the bottom of ID documents, printed in OCR-B font with characters <code>A–Z</code>, digits <code>0–9</code>, and the filler symbol <code>&lt;</code>.</p>
         <img src="pictures/mrz.jpg" alt="MRZ example on ID card">
         <p>In the European Union, the MRZ on standardised identity cards (TD-1 format) always consists of <strong>3 lines of 30 characters</strong>. It encodes the document type, issuing state, document number, dates of birth and expiry, and the holder’s names in a structured way so that it can be automatically read and validated by identity verification systems.</p>
-        <p><a href="https://www.consilium.europa.eu/prado/en/prado-glossary/prado-glossary.pdf#page=88" target="_blank" style="color:var(--text);text-decoration:underline">For more information, click here</a></p>
+        <p><a href="https://www.consilium.europa.eu/prado/en/prado-glossary/prado-glossary.pdf#page=88" target="_blank" style="color:#000;text-decoration:underline">For more information, click here</a></p>
       </div>
     </div>
   </div>
 
-  <!-- How to copy MRZ on mobile modal (JUSTIFIED) -->
+  <!-- How to copy MRZ on mobile modal -->
   <div id="howModal" class="modal-backdrop">
     <div class="modal">
       <header>
@@ -229,23 +178,23 @@
       </header>
       <div class="content">
         <p><strong>Goal:</strong> Take a clear photo of the ID card’s MRZ (the 3 lines), select that text on your phone, copy it, and paste it into this page’s “MRZ text” box.</p>
-        <p><strong>On iPhone (iOS):</strong></p>
+        <p><strong>On iPhone (iOS)</strong></p>
         <ol>
-          <li>Open the <em>Camera</em> app and take a focused photo of the MRZ (good lighting, keep it flat and horizontal).</li>
+          <li>Open the <em>Camera</em> app and take a focused photo of the MRZ (good lighting, keep it flat).</li>
           <li>Open the photo in the <em>Photos</em> app.</li>
-          <li>Tap the <em>Live Text</em> icon (or long-press directly on the MRZ lines) until selection handles show.</li>
-          <li>Drag to select all three MRZ lines, then tap <em>Copy</em>.</li>
+          <li>Tap the <em>Live Text</em> (text-detection) icon if it appears, or long-press directly on the MRZ lines until selection handles show.</li>
+          <li>Drag the handles to select all three MRZ lines. Tap <em>Copy</em>.</li>
           <li>Return to this page, tap inside the “MRZ text” box, and tap <em>Paste</em>.</li>
         </ol>
-        <p><strong>On Android (modern versions):</strong></p>
+        <p><strong>On Android (modern versions)</strong></p>
         <ol>
           <li>Open the <em>Camera</em> app and take a focused photo of the MRZ.</li>
           <li>Open the photo in <em>Google Photos</em> (or your gallery).</li>
-          <li>Tap the <em>Lens</em> icon (or <em>Text</em>) to detect selectable text.</li>
+          <li>Tap the <em>Lens</em> icon (or <em>Text</em>). Google Lens will detect selectable text.</li>
           <li>Tap and drag to select all three MRZ lines, then tap <em>Copy</em>.</li>
           <li>Return to this page, tap inside the “MRZ text” box, and tap <em>Paste</em>.</li>
         </ol>
-        <p><strong>Tips:</strong> Ensure the MRZ is sharp and well-lit. If only part of a line is selected, zoom in and try again. You can correct characters after pasting, then click “Verify MRZ”.</p>
+        <p><strong>Tips:</strong> Ensure the MRZ is sharp and horizontal. If the phone selects only part of a line, zoom in and try again. You can also paste first and correct any characters before clicking “Verify MRZ”.</p>
       </div>
     </div>
   </div>
@@ -402,10 +351,11 @@
       throw new Error('Unrecognized MRZ format.');
     }
 
+    // ---------- Sanity checks for MRZ (TD1) ----------
     function validateMrz(raw, parsed){
       const lines = raw.trim().split(/\r?\n/).map(l=>l.replace(/\s+/g,'').toUpperCase()).filter(Boolean);
       if (lines.length !== 3) return 'The MRZ should contain exactly 3 lines for an ID card (TD-1).';
-      if (!lines.every(l => /^[A-Z0-9<]+$/.test(l))) return 'MRZ must contain only A–Z, digits, and “<” characters.';
+      if (!lines.every(l => /^[A-Z0-9<]+$/.test(l))) return 'MRZ must contain only A–Z, digits, and "<" characters.';
       if (!isAlpha3(parsed.issuing_country)) return 'Issuing country code seems invalid.';
       if (!isAlpha3(parsed.nationality)) return 'Nationality code seems invalid.';
       if (!/^\d{4}-\d{2}-\d{2}$/.test(parsed.birth_date)) return 'Birth date could not be read.';
@@ -415,6 +365,7 @@
       return '';
     }
 
+    // ---------- OCR: extract MRZ from images (step 1) ----------
     async function extractMrzFromImages() {
       const backFile = document.getElementById('backFile').files?.[0];
       const frontFile = document.getElementById('frontFile').files?.[0];
@@ -425,7 +376,7 @@
       }
 
       ocrProgress(true, 0, 'OCR starting…');
-      setStatus('Trying to read the MRZ from your image…', 'info');
+      setStatus('Running OCR on image…', 'info');
 
       const imgFile = (backFile && isImageFile(backFile)) ? backFile : frontFile;
       const url = URL.createObjectURL(imgFile);
@@ -451,7 +402,7 @@
 
         if (picked.length < 2) {
           ocrProgress(false);
-          setStatus('The recognition software could not reliably read the MRZ. Please type or paste the full MRZ (3 lines) exactly as shown on your ID card, then click “Verify MRZ” again.', 'err');
+          setStatus('The image recognition software seems to have scrambled the MRZ text. We apologize for any inconvenience. Please manually insert and/or correct the entire MRZ text (3 lines) exactly as it appears on your ID card, and then click “Verify MRZ” again.', 'err');
           return;
         }
 
@@ -459,7 +410,7 @@
         document.getElementById('mrzText').value = mrz;
 
         ocrProgress(false);
-        setStatus('OCR complete. The MRZ has been inserted below. Please check carefully and correct any mistakes before clicking “Verify MRZ”.', 'ok');
+        setStatus('OCR complete. The MRZ has been inserted below. Please check the text matches your card, correct if needed, then click “2 Verify MRZ”, and finally “3 Send to office”.', 'ok');
       } catch (e) {
         console.error(e);
         ocrProgress(false);
@@ -467,6 +418,7 @@
       }
     }
 
+    // ---------- Wire buttons ----------
     extractBtn.addEventListener('click', extractMrzFromImages);
 
     parseBtn.addEventListener('click', () => {
@@ -475,7 +427,7 @@
         const parsed=parseMrzText(txt);
         const problem = validateMrz(txt, parsed);
         if (problem) {
-          setStatus('The MRZ text appears incomplete or inconsistent. Please review and correct it exactly as printed on your ID card, then click “Verify MRZ” again. (' + problem + ')', 'err');
+          setStatus('The image recognition software seems to have scrambled the MRZ text. We apologize for any inconvenience. Please manually insert and/or correct the entire MRZ text (3 lines) exactly as it appears on your ID card, and then click “Verify MRZ” again. (' + problem + ')', 'err');
           return;
         }
 
@@ -489,7 +441,7 @@
 
         lastResult.fields = { ...parsed, mrz_valid:true };
         lastResult.timestamp_utc=new Date().toISOString();
-        setStatus('MRZ parsed ✔ The fields below have been filled. Please review them carefully before sending.', 'ok');
+        setStatus('MRZ parsed ✔ Please review the extracted fields. If correct, click “3 Send to office”.', 'ok');
       }catch(e){
         console.error(e);
         setStatus('MRZ parse failed. Please paste/correct the 3 MRZ lines exactly as printed and click “Verify MRZ” again.', 'err');
@@ -527,8 +479,8 @@
         sendProgress(false);
 
         if(!res.ok||!j.success) throw new Error(j.error||`HTTP ${res.status}`);
-        setStatus('Sent to SSTLaw', 'ok');
-        alert('Sent to SSTLaw ✅ Thank you!');
+        setStatus('Sent to office ✔', 'ok');
+        alert('Sent to office ✅');
       }catch(e){
         console.error(e);
         sendProgress(false);
