@@ -52,7 +52,7 @@
       <textarea id="mrzText" placeholder="Example (TD1 ID card, 3 lines):
 IDLUXOJU2SD8AV5241202<<<<<<<<<
 8408060M3412020LUX<<<<<<<<<<<3
-DOE<<JANE<ALICE<<<<<<<<<<<<<<"></textarea>
+LENERT<<LAURENT<FREDERIC<<<<<<"></textarea>
 
       <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:8px">
         <button id="parseMrzBtn" class="btn secondary" type="button">Parse MRZ text</button>
@@ -98,14 +98,16 @@ DOE<<JANE<ALICE<<<<<<<<<<<<<<"></textarea>
     }
     function dataUrlToBase64(u){ const i=u.indexOf('base64,'); return i>=0?u.slice(i+7):u; }
     function clean(s){ return (s||'').replace(/</g,' ').trim(); }
+
+    // 50-year cutoff (MRZ convention): >=50 => 19xx ; <50 => 20xx
     function ymd(yyMMdd){
       if(!/^\d{6}$/.test(yyMMdd)) return '';
       const yy=+yyMMdd.slice(0,2), mm=yyMMdd.slice(2,4), dd=yyMMdd.slice(4,6);
-      const year = yy>=30 ? 1900+yy : 2000+yy;
+      const year = yy>=50 ? 1900+yy : 2000+yy;
       return `${year}-${mm}-${dd}`;
     }
 
-    // Robust MRZ parser: TD3 (2x44) and TD1 (3x~30). TD1 variant matches your example.
+    // Robust MRZ parser: TD3 (2x44) and TD1 (3x~30). TD1 variant matches the LU example you sent.
     function parseMrzText(raw){
       const lines = raw.trim().split(/\r?\n/).map(l=>l.replace(/\s+/g,'').toUpperCase()).filter(Boolean);
       if(lines.length<2) throw new Error('Paste 2–3 MRZ lines.');
@@ -127,22 +129,17 @@ DOE<<JANE<ALICE<<<<<<<<<<<<<<"></textarea>
         };
       }
 
-      // TD1 (ID card) — Luxemburg style (your sample)
+      // TD1 (ID card) — Luxembourg style (your sample)
       if(lines.length>=3 && lines[0].startsWith('ID')){
         const l1=lines[0], l2=lines[1], l3=lines[2];
         const issuing=l1.slice(2,5).replace(/</g,'');
-        const docNumber = l1.slice(5).replace(/</g,''); // doc number right after issuing country (your sample)
-
-        // line 2 pattern: YYMMDD (birth) + check + sex + YYMMDD (expiry) + check + nationality (3)
-        // example: 8408060M3412020LUX<<<<<<<<<<<3
+        const docNumber = l1.slice(5).replace(/</g,'');
         const birth = ymd(l2.slice(0,6));
         const sex   = l2.slice(7,8).replace('<','U');
         const expiry= ymd(l2.slice(8,14));
         const nationality = l2.slice(15,18).replace(/</g,'');
-
         const [surRaw, givRaw=''] = l3.split('<<');
         const given = clean(givRaw.replace(/<+/g,' '));
-
         return {
           surname: clean(surRaw),
           given_names: given,
@@ -155,24 +152,21 @@ DOE<<JANE<ALICE<<<<<<<<<<<<<<"></textarea>
         };
       }
 
-      // Generic TD1 fallback (pattern search)
+      // Generic TD1 fallback: search for two YYMMDD blocks on line 2
       if(lines.length>=3){
         const l1=lines[0], l2=lines[1], l3=lines[2];
         const issuing = l1.slice(2,5).replace(/</g,'');
         const [surRaw, givRaw=''] = l3.split('<<');
         const given = clean(givRaw.replace(/<+/g,' '));
-
-        // find two YYMMDD chunks in l2
-        const idx = [...l2.matchAll(/\d{6}/g)].map(m=>m.index);
+        const idx=[...l2.matchAll(/\d{6}/g)].map(m=>m.index);
         let birth='', expiry='', sex='U';
         if(idx.length>=2){
           birth = ymd(l2.slice(idx[0], idx[0]+6));
           expiry= ymd(l2.slice(idx[1], idx[1]+6));
           sex   = (l2[idx[0]+7]||'<').replace('<','U');
         }
-        const docNumber = (l1.slice(5).match(/[A-Z0-9]+/)||[''])[0];
-        const nationality = (l2.match(/[A-Z]{3}/g)||[issuing]).pop();
-
+        const docNumber=(l1.slice(5).match(/[A-Z0-9]+/)||[''])[0];
+        const nationality=(l2.match(/[A-Z]{3}/g)||[issuing]).pop();
         return {
           surname: clean(surRaw),
           given_names: given,
@@ -188,7 +182,7 @@ DOE<<JANE<ALICE<<<<<<<<<<<<<<"></textarea>
       throw new Error('Unrecognized MRZ format.');
     }
 
-    // previews + store attachments
+    // previews + keep attachments in state
     async function handlePreview(inputEl, previewEl){
       previewEl.innerHTML='';
       const f=inputEl.files&&inputEl.files[0]; if(!f) return;
@@ -201,7 +195,7 @@ DOE<<JANE<ALICE<<<<<<<<<<<<<<"></textarea>
     document.getElementById('frontFile').addEventListener('change',e=>handlePreview(e.target,document.getElementById('frontPreview')));
     document.getElementById('backFile') .addEventListener('change',e=>handlePreview(e.target, document.getElementById('backPreview')));
 
-    // Parse MRZ text button
+    // Parse MRZ text
     document.getElementById('parseMrzBtn').addEventListener('click',()=>{
       const txt=document.getElementById('mrzText').value||'';
       try{
@@ -227,6 +221,7 @@ DOE<<JANE<ALICE<<<<<<<<<<<<<<"></textarea>
           country:document.getElementById('outIssuing').value||'',
           birthdate:document.getElementById('outBirth').value||'',
           expiry:document.getElementById('outExpiry').value||'',
+          document_number:document.getElementById('outDoc').value||'',
           valid:String(lastResult?.fields?.mrz_valid||false),
           ip:'', checkedAtUtc:new Date().toISOString()
         };
