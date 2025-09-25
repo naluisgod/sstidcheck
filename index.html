@@ -92,7 +92,7 @@
       </p>
     </div>
 
-    <!-- 3) ALL INTERACTIONS ARE GATED UNTIL CONSENT -->
+    <!-- 3) GATED CONTROLS (disabled until consent) -->
     <div class="card gated" id="gateUploads" aria-disabled="true">
       <p class="note"><strong>Currently, only ID cards issued by a member State of the European Economic Area, Switzerland, and the United Kingdom are accepted.</strong> Support for international passports will be implemented soon. Thank you for your understanding.</p>
       <p class="note"><strong>Accepted file formats:</strong> JPG, JPEG, PNG, PDF (max ~10&nbsp;MB total). Upload the <em>front</em> and <em>back</em> of the ID card.</p>
@@ -242,41 +242,149 @@ SPECIMEN<<JEANNE<<<<<<<<<<<<<" disabled></textarea>
     }
     function dataUrlToBase64(u){ const i=u.indexOf('base64,'); return i>=0?u.slice(i+7):u; }
     function clean(s){ return (s||'').replace(/</g,' ').trim(); }
-    function ymd(yyMMdd){
-      if(!/^\d{6}$/.test(yyMMdd)) return '';
-      const yy=+yyMMdd.slice(0,2), mm=yyMMdd.slice(2,4), dd=yyMMdd.slice(4,6);
-      const year = yy>=50 ? 1900+yy : 2000+yy;
+
+    // ---- MRZ strict helpers (checksums, dates) ----
+    function charVal(c){
+      if (c === '<') return 0;
+      if (c >= '0' && c <= '9') return c.charCodeAt(0) - 48;
+      if (c >= 'A' && c <= 'Z') return c.charCodeAt(0) - 55; // 'A'->10 … 'Z'->35
+      return NaN;
+    }
+    function mrzChecksum(s){
+      const weights = [7,3,1];
+      let sum = 0;
+      for (let i=0;i<s.length;i++){
+        const v = charVal(s[i]);
+        if (Number.isNaN(v)) return NaN;
+        sum += v * weights[i % 3];
+      }
+      return (sum % 10);
+    }
+    function onlyMrzChars(s){ return /^[A-Z0-9<\n\r]+$/.test(s); }
+    function isYYMMDD(s){
+      if(!/^\d{6}$/.test(s)) return false;
+      const yy = +s.slice(0,2), mm = +s.slice(2,4), dd = +s.slice(4,6);
+      if(mm<1 || mm>12) return false;
+      const daysInMonth = new Date(2000, mm, 0).getDate();
+      if(dd<1 || dd>daysInMonth) return false;
+      return true;
+    }
+    function toISODate(yyMMdd){
+      const yy = +yyMMdd.slice(0,2), mm = yyMMdd.slice(2,4), dd = yyMMdd.slice(4,6);
+      const year = yy >= 50 ? 1900 + yy : 2000 + yy; // 50-year cutoff
       return `${year}-${mm}-${dd}`;
     }
+    function assert(cond, msg){ if(!cond) throw new Error(msg); }
 
-    // TD3/TD1 MRZ parser (short version)
+    // ---- STRICT MRZ PARSER (TD3 & TD1) ----
     function parseMrzText(raw){
-      const lines = raw.trim().split(/\r?\n/).map(l=>l.replace(/\s+/g,'').toUpperCase()).filter(Boolean);
-      if(lines.length<2) throw new Error('Paste 2–3 MRZ lines.');
+      let text = raw.trim().toUpperCase().replace(/\s+$/,'');
+      assert(text.length > 0, 'Empty MRZ.');
+      assert(onlyMrzChars(text.replace(/\r/g,'')), 'MRZ contains invalid characters. Use only A–Z, 0–9 and "<".');
+
+      const lines = text.split(/\r?\n/).map(l=>l.replace(/\s+/g,'')).filter(Boolean);
+      assert(lines.length === 2 || lines.length === 3, 'MRZ must have 2 (passport) or 3 (ID) lines.');
 
       // TD3 passport
-      if(lines.length===2 && lines[0].length>=40 && lines[1].length>=40){
-        const l1=lines[0].padEnd(44,'<'), l2=lines[1].padEnd(44,'<');
-        const issuing=l1.slice(2,5);
-        const [surRaw, givRaw='']=l1.slice(5).split('<<');
-        const doc=l2.slice(0,9).replace(/</g,'');
-        const nationality=l2.slice(10,13).replace(/</g,'');
-        const birth=ymd(l2.slice(13,19));
-        const expiry=ymd(l2.slice(21,27));
-        return { surname:clean(surRaw), given_names:clean(givRaw.replace(/<+/g,' ')), issuing_country:issuing, nationality, document_number:doc, birth_date:birth, expiration_date:expiry };
+      if (lines.length === 2 && lines[0].length >= 40 && lines[1].length >= 40) {
+        const L1 = lines[0].padEnd(44,'<');
+        const L2 = lines[1].padEnd(44,'<');
+
+        const docType = L1.slice(0,2);
+        const issuing = L1.slice(2,5);
+        const namePart = L1.slice(5);
+        const [surRaw, givRaw=''] = namePart.split('<<');
+
+        const docNumber = L2.slice(0,9);
+        const docChk    = L2.slice(9,10);
+        const nationality = L2.slice(10,13);
+        const birth     = L2.slice(13,19);
+        const birthChk  = L2.slice(19,20);
+        const sex       = L2.slice(20,21);
+        const expiry    = L2.slice(21,27);
+        const expiryChk = L2.slice(27,28);
+
+        assert(/^[A-Z<]{2}$/.test(docType), 'Invalid doc type.');
+        assert(/^[A-Z<]{3}$/.test(issuing), 'Invalid issuing state (3 letters).');
+        assert(/^[A-Z<]+$/.test(namePart), 'Invalid name block.');
+
+        assert(/^\d$/.test(docChk), 'Missing doc-number checksum.');
+        assert(mrzChecksum(docNumber) === +docChk, 'Document number checksum failed.');
+
+        assert(/^\d{6}$/.test(birth) && /^\d$/.test(birthChk), 'Invalid birth date / checksum.');
+        assert(mrzChecksum(birth) === +birthChk, 'Birth date checksum failed.');
+        assert(isYYMMDD(birth), 'Birth date not a valid YYMMDD.');
+
+        assert(/^\d{6}$/.test(expiry) && /^\d$/.test(expiryChk), 'Invalid expiry date / checksum.');
+        assert(mrzChecksum(expiry) === +expiryChk, 'Expiry date checksum failed.');
+        assert(isYYMMDD(expiry), 'Expiry date not a valid YYMMDD.');
+
+        const birthISO = toISODate(birth);
+        const expiryISO = toISODate(expiry);
+
+        assert(/^[A-Z<]{3}$/.test(nationality), 'Invalid nationality (3 letters).');
+
+        return {
+          surname: surRaw.replace(/<+/g,' ').trim(),
+          given_names: (givRaw||'').replace(/<+/g,' ').trim(),
+          issuing_country: issuing.replace(/</g,''),
+          nationality: nationality.replace(/</g,''),
+          document_number: docNumber.replace(/</g,''),
+          birth_date: birthISO,
+          sex: sex === '<' ? 'U' : sex,
+          expiration_date: expiryISO
+        };
       }
+
       // TD1 ID card
-      if(lines.length>=3 && lines[0].startsWith('ID')){
-        const l1=lines[0], l2=lines[1], l3=lines[2];
-        const issuing=l1.slice(2,5).replace(/</g,'');
-        const docNumber = l1.slice(5).replace(/</g,'');
-        const birth = ymd(l2.slice(0,6));
-        const expiry= ymd(l2.slice(8,14));
-        const nationality = l2.slice(15,18).replace(/</g,'');
-        const [surRaw, givRaw=''] = l3.split('<<');
-        const given = clean(givRaw.replace(/<+/g,' '));
-        return { surname: clean(surRaw), given_names: given, issuing_country: issuing, nationality, document_number: docNumber, birth_date: birth, expiration_date: expiry };
+      if (lines.length === 3) {
+        const L1 = lines[0], L2 = lines[1], L3 = lines[2];
+
+        assert(L1.startsWith('ID'), 'TD1 ID should start with "ID".');
+
+        const issuing = L1.slice(2,5).replace(/</g,'');
+        assert(/^[A-Z]{3}$/.test(issuing), 'Invalid issuing state (3 letters).');
+
+        const docMatch = L1.slice(5).match(/^[A-Z0-9<]+/);
+        assert(!!docMatch, 'Missing document number.');
+        const docRaw = (docMatch[0] || '').replace(/</g,'');
+        assert(/^[A-Z0-9]+$/.test(docRaw) && docRaw.length >= 6 && docRaw.length <= 14, 'Invalid document number.');
+
+        const birth = L2.slice(0,6);
+        const birthChk = L2.slice(6,7);
+        const sex  = L2.slice(7,8);
+        const expiry = L2.slice(8,14);
+        const expiryChk = L2.slice(14,15);
+
+        assert(/^\d{6}$/.test(birth) && /^\d$/.test(birthChk), 'Invalid birth date / checksum (TD1).');
+        assert(mrzChecksum(birth) === +birthChk, 'Birth date checksum failed (TD1).');
+        assert(isYYMMDD(birth), 'Birth date not a valid YYMMDD.');
+
+        assert(/^\d{6}$/.test(expiry) && /^\d$/.test(expiryChk), 'Invalid expiry date / checksum (TD1).');
+        assert(mrzChecksum(expiry) === +expiryChk, 'Expiry date checksum failed (TD1).');
+        assert(isYYMMDD(expiry), 'Expiry date not a valid YYMMDD.');
+
+        const nationality = (L2.slice(15,18) || '').replace(/</g,'');
+        assert(/^[A-Z]{3}$/.test(nationality), 'Invalid nationality (3 letters).');
+
+        const [surRaw, givRaw=''] = L3.split('<<');
+        assert(!!surRaw, 'Missing surname block.');
+        const surname = surRaw.replace(/<+/g,' ').trim();
+        const given   = (givRaw||'').replace(/<+/g,' ').trim();
+        assert(surname.length>0 && given.length>0, 'Missing surname or given names.');
+
+        return {
+          surname,
+          given_names: given,
+          issuing_country: issuing,
+          nationality,
+          document_number: docRaw,
+          birth_date: toISODate(birth),
+          sex: sex === '<' ? 'U' : sex,
+          expiration_date: toISODate(expiry)
+        };
       }
+
       throw new Error('Unrecognized MRZ format.');
     }
 
@@ -295,15 +403,18 @@ SPECIMEN<<JEANNE<<<<<<<<<<<<<" disabled></textarea>
     document.getElementById('btnOcr').addEventListener('click', async ()=>{
       try{
         const back = document.getElementById('backFile').files[0];
-        if(!back || !back.type.startsWith('image/')){ setStatus('Please upload a clear back-side image (MRZ).', false); return; }
+        if(!back || !back.type.startsWith('image/')){ setStatus('Please upload a clear back-side image (MRZ).', 'err'); return; }
         setStatus('Running OCR on the back image…', 'info');
-        const { data:{ text } } = await Tesseract.recognize(back, 'eng', {
-          logger: m=>{}
-        });
-        const cleaned = text.replace(/[^\w<\n]/g,'').replace(/\r/g,'').trim();
+        const { data:{ text } } = await Tesseract.recognize(back, 'eng', { logger: m=>{} });
+        const cleaned = text
+          .toUpperCase()
+          .replace(/[^A-Z0-9<\n\r]/g,'')  // keep only MRZ chars
+          .replace(/[|]/g,'<')            // common OCR confusion
+          .replace(/\r/g,'')
+          .trim();
         document.getElementById('mrzText').value = cleaned;
         setStatus('MRZ text extracted via OCR. Please check and correct if needed, then click “Verify MRZ”.', 'ok');
-      }catch(e){ console.error(e); setStatus('OCR failed: '+(e.message||e), false); }
+      }catch(e){ console.error(e); setStatus('OCR failed: '+(e.message||e), 'err'); }
     });
 
     // === VERIFY (step 2) ===
@@ -318,14 +429,14 @@ SPECIMEN<<JEANNE<<<<<<<<<<<<<" disabled></textarea>
         document.getElementById('outExpiry').value=f.expiration_date||'';
         document.getElementById('outDoc').value=f.document_number||'';
         document.getElementById('outNat').value=f.nationality||'';
-        setStatus('MRZ parsed ✔', 'ok');
-      }catch(e){ console.error(e); setStatus('MRZ parse failed: '+e.message,false); }
+        setStatus('MRZ parsed and validated ✔', 'ok');
+      }catch(e){ console.error(e); setStatus('MRZ parse failed: '+e.message,'err'); }
     });
 
     // === SEND (step 3) ===
     document.getElementById('btnSend').addEventListener('click', async ()=>{
       const consent = document.getElementById('consentChk');
-      if(!consent.checked){ setStatus('Please accept the client due diligence & data processing notice.', false); return; }
+      if(!consent.checked){ setStatus('Please accept the client due diligence & data processing notice.', 'err'); return; }
 
       const meta={
         name:document.getElementById('outSurname').value||'',
@@ -387,7 +498,7 @@ SPECIMEN<<JEANNE<<<<<<<<<<<<<" disabled></textarea>
         alert('Sent ✅ Thank you! We will get back to you shortly.');
       }catch(e){
         console.error(e);
-        setStatus('Send failed: '+(e?.message||e), false);
+        setStatus('Send failed: '+(e?.message||e), 'err');
         bar.style.display='none'; fill.style.width='0%';
         alert('Failed to send: '+(e?.message||e));
       }
