@@ -73,7 +73,7 @@
       <div class="legal" id="cdd-notice">
         <p class="legal-title">Client due diligence &amp; data processing notice</p>
         <p>
-          By continuing, you acknowledge and accept that <strong>SCHIRRER, SCHONS &amp; TRITSCHLER</strong> (the “Firm”) is subject to mandatory client due diligence obligations under applicable anti-money laundering and counter-terrorism financing legislation. For this purpose, you consent to provide the Firm with the following information: your surname and given name(s), date of birth, <strong>citizenship</strong>, the reference number of your identity card, its issuing country, and its expiry date. This information will be collected and stored strictly in accordance with the provisions of the applicable laws and regulations. In addition, you acknowledge and agree that your current <strong>IPv4 or IPv6 address</strong>, the <strong>user agent</strong> of your internet browser, and the <strong>type of device</strong> used may also be stored alongside the aforementioned information. For the avoidance of doubt, there are no legal or regulatory provisions preventing you from using a virtual private network (VPN) or from modifying/spoofing your browser user agent. <em>No other categories of personal data will be collected.</em> Please note that applicable laws and regulations — notably the <strong>Luxembourg Law of 12 November 2004</strong> on the fight against money laundering and terrorist financing, as amended, <strong>Regulation (EU) 2015/847</strong>, and related EU instruments — may restrict or derogate from certain rights otherwise granted under <strong>Regulation (EU) 2016/679 (General Data Protection Regulation)</strong>. These obligations are further specified in the professional rules applicable to members of the Luxembourg Bar (<em>Règlement Intérieur de l’Ordre des Avocats du Barreau de Luxembourg</em>) and in the regulatory framework of the <strong>Commission de Surveillance du Secteur Financier (CSSF)</strong>, which implement and oversee compliance with these requirements.
+          By continuing, you acknowledge and accept that <strong>SCHIRRER, SCHONS &amp; TRITSCHLER</strong> (the “Firm”) is subject to mandatory client due diligence obligations under applicable anti-money laundering and counter-terrorism financing legislation. For this purpose, you consent to provide the Firm with the following information: your surname and given name(s), date of birth, citizenship, the reference number of your identity card, its issuing country, and its expiry date. This information will be collected and stored strictly in accordance with the provisions of the applicable laws and regulations. In addition, you acknowledge and agree that your current IPv4 and/or IPv6 address, the browser user agent, and the device used may also be stored alongside the aforementioned information. For the avoidance of doubt, there are no legal or regulatory provisions preventing you from using a virtual private network or from modifying your browser user agent. Please note that applicable laws and regulations — notably the Luxembourg Law of 12 November 2004 on the fight against money laundering and terrorist financing, as amended, Regulation (EU) 2015/847, and related EU instruments — may restrict or derogate from certain rights otherwise granted under Regulation (EU) 2016/679 (General Data Protection Regulation). These obligations are further specified in the professional rules applicable to members of the Luxembourg Bar (Règlement Intérieur de l’Ordre des Avocats du Barreau de Luxembourg</em>) and in the regulatory framework of the Commission de Surveillance du Secteur Financier (CSSF), which implement and oversee compliance with these requirements.
         </p>
         <label for="consentChk">
           <input type="checkbox" id="consentChk" />
@@ -336,20 +336,36 @@ SPECIMEN<<JEANNE<<<<<<<<<<<<<" disabled></textarea>
         };
       }
 
-      // TD1 ID card
+      // ----- TD1 (ID card) — tolerant document number parsing -----
       if (lines.length === 3) {
-        const L1 = lines[0], L2 = lines[1], L3 = lines[2];
+        // Pad L1/L2 for safe slicing
+        const L1 = lines[0].padEnd(30,'<');
+        const L2 = lines[1].padEnd(30,'<');
+        const L3 = lines[2];
 
         assert(L1.startsWith('ID'), 'TD1 ID should start with "ID".');
 
         const issuing = L1.slice(2,5).replace(/</g,'');
         assert(/^[A-Z]{3}$/.test(issuing), 'Invalid issuing state (3 letters).');
 
-        const docMatch = L1.slice(5).match(/^[A-Z0-9<]+/);
-        assert(!!docMatch, 'Missing document number.');
-        const docRaw = (docMatch[0] || '').replace(/</g,'');
-        assert(/^[A-Z0-9]+$/.test(docRaw) && docRaw.length >= 6 && docRaw.length <= 14, 'Invalid document number.');
+        // Preferred ICAO field: 9 chars at pos 5–13 + checksum at pos 14
+        const docField = L1.slice(5,14);
+        const docChk   = L1.slice(14,15);
+        let   docRaw   = docField.replace(/</g,'');
 
+        if (/^\d$/.test(docChk)) {
+          assert(mrzChecksum(docField) === +docChk, 'Document number checksum failed (TD1).');
+        }
+
+        // Fallback for variable-length national formats
+        if (!docRaw || docRaw.length < 5) {
+          const alt = (L1.slice(5).match(/[A-Z0-9]{5,25}/) || [])[0] || '';
+          assert(alt, 'Missing document number.');
+          docRaw = alt;
+        }
+        assert(/^[A-Z0-9]+$/.test(docRaw), 'Invalid document number characters.');
+
+        // Line 2: birth YYMMDD + chk, sex, expiry YYMMDD + chk, nationality
         const birth = L2.slice(0,6);
         const birthChk = L2.slice(6,7);
         const sex  = L2.slice(7,8);
@@ -367,6 +383,7 @@ SPECIMEN<<JEANNE<<<<<<<<<<<<<" disabled></textarea>
         const nationality = (L2.slice(15,18) || '').replace(/</g,'');
         assert(/^[A-Z]{3}$/.test(nationality), 'Invalid nationality (3 letters).');
 
+        // Line 3: names
         const [surRaw, givRaw=''] = L3.split('<<');
         assert(!!surRaw, 'Missing surname block.');
         const surname = surRaw.replace(/<+/g,' ').trim();
